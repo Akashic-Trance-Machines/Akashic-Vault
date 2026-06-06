@@ -76,6 +76,17 @@ OBJS += \
 	$(PLAITS_CORE)/stmlib/dsp/units.o \
 	$(PLAITS_CORE)/stmlib/utils/random.o
 
+# ── AV-CloudSeed (GhostNote algorithmic reverb, MIT core) ────────────────────
+CLOUDSEED_DIR  = modules/audiofx/cloudseed
+CLOUDSEED_CORE = $(CLOUDSEED_DIR)/core/CloudSeedCore
+OBJS += \
+	$(CLOUDSEED_DIR)/src/cloudseed_fx.o \
+	$(CLOUDSEED_DIR)/src/presets.o \
+	$(CLOUDSEED_CORE)/DSP/Biquad.o \
+	$(CLOUDSEED_CORE)/DSP/FastSin.o \
+	$(CLOUDSEED_CORE)/DSP/RandomBuffer.o \
+	$(CLOUDSEED_CORE)/Parameters.o
+
 EXTRACLEAN = $(OBJS) $(OBJS:.o=.d)
 
 # ── Version stamp ─────────────────────────────────────────────────────────────
@@ -101,6 +112,10 @@ INCLUDE += -I $(NEWLIBDIR)/include -I $(CIRCLE_STDLIB_DIR)/include
 # Plaits/stmlib: include the vendored core root so `#include "plaits/..."` and
 # `#include "stmlib/..."` resolve correctly.
 INCLUDE += -I $(PLAITS_CORE) -I $(PLAITS_DIR)/src
+# CloudSeed: core root + compat/ for <arm_math.h> stub on AArch64.
+# Force-include cstdlib so std::rand in the core compiles without patching it.
+INCLUDE += -I $(CLOUDSEED_CORE)/.. -I $(CLOUDSEED_DIR)/src -I $(CLOUDSEED_DIR)/core/compat
+CFLAGS += -include cstdlib
 
 # ── Libraries (order matters for the GNU linker) ──────────────────────────────
 # NOTE: confirm the exact set/paths against the vendored circle-stdlib version.

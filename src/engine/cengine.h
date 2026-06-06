@@ -40,6 +40,7 @@ public:
 	// Direct injection — for pre-constructed instances (not owned by engine).
 	void	SetGeneratorDirect (unsigned nSlot, ISoundGenerator *pGen);
 	bool	SetAudioFX (unsigned nFxSlot, const char *pModuleId);	// 0..2
+	void	SetAudioFXDirect (unsigned nFxSlot, IAudioFX *pFX);	// direct injection
 	bool	AddMidiFX (const char *pModuleId);
 	void	ClearMidiFX ();
 

@@ -92,6 +92,14 @@ void CEngine::ClearMidiFX ()
 	m_nMidiFX = 0;
 }
 
+void CEngine::SetAudioFXDirect (unsigned nFxSlot, IAudioFX *pFX)
+{
+	if (nFxSlot >= NUM_FX_SLOTS || !pFX)
+		return;
+	// Don't delete — not owned. Caller keeps ownership.
+	m_pFX[nFxSlot] = pFX;
+}
+
 void CEngine::SetGeneratorDirect (unsigned nSlot, ISoundGenerator *pGen)
 {
 	if (nSlot >= MAX_GENERATORS || !pGen)

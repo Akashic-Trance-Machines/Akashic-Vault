@@ -123,6 +123,10 @@ boolean CKernel::Initialize ()
 	m_Engine.SetGeneratorDirect (0, &m_Plaits);
 	LOGNOTE ("Plaits loaded — 24 engines ready");
 
+	m_CloudSeed.Init (48000, MAX_BLOCK);
+	m_Engine.SetAudioFXDirect (0, &m_CloudSeed);
+	LOGNOTE ("CloudSeed loaded");
+
 	// ── I2S audio ─────────────────────────────────────────────────────────────
 	m_I2SAudio.SetEngine (&m_Engine);
 	if (bOK && !m_I2SAudio.Start ())
@@ -256,9 +260,14 @@ void CKernel::BuildMenus ()
 	MakeMenuRow     (&m_PageSoundGen, "Tone",    &m_PageTone);
 	MakeMenuRow     (&m_PageSoundGen, "Mod",     &m_PageMod);
 
-	// ── FX Chain page (stubs) ─────────────────────────────────────────────
+	// ── CloudSeed param page (all 46 params, scrollable) ─────────────────
+	InitPage (&m_PageCloudSeed, "CloudSeed", &m_PageFXChain);
+	for (unsigned i = 0; i < m_CloudSeed.NumParams (); i++)
+		MakeParamRow (&m_PageCloudSeed, &m_CloudSeed, i);
+
+	// ── FX Chain page ─────────────────────────────────────────────────────
 	InitPage (&m_PageFXChain, "FX Chain", &m_PageOSRoot);
-	MakeReadOnlyRow (&m_PageFXChain, "FX1", "None");
+	MakeMenuRow  (&m_PageFXChain, "FX1: CloudSeed", &m_PageCloudSeed);
 	MakeReadOnlyRow (&m_PageFXChain, "FX2", "None");
 	MakeReadOnlyRow (&m_PageFXChain, "FX3", "None");
 

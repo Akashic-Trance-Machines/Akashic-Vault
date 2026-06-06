@@ -7,3 +7,6 @@
 [submodule "src/modules/generators/plaits"]
 	path = src/modules/generators/plaits
 	url = https://github.com/Akashic-Trance-Machines/AV-Plaits.git
+[submodule "src/modules/audiofx/cloudseed"]
+	path = src/modules/audiofx/cloudseed
+	url = https://github.com/Akashic-Trance-Machines/AV-CloudSeed.git

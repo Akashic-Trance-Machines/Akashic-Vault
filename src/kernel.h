@@ -36,6 +36,7 @@
 #include "platform/ci2saudio.h"
 #include "ui/c4rowui.h"
 #include "modules/generators/plaits/src/plaits_generator.h"
+#include "modules/audiofx/cloudseed/src/cloudseed_fx.h"
 
 enum TShutdownMode { ShutdownNone, ShutdownHalt, ShutdownReboot };
 
@@ -99,6 +100,9 @@ private:
 	// ── Generators ────────────────────────────────────────────────────────
 	CPlaitsGenerator	m_Plaits;
 
+	// ── Audio FX ──────────────────────────────────────────────────────────
+	CCloudSeedFX		m_CloudSeed;	// FX slot 0
+
 	// ── 4-row UI ──────────────────────────────────────────────────────────
 	C4RowUI			m_UI;
 
@@ -131,6 +135,7 @@ private:
 	TMenuPage	m_PageTone;
 	TMenuPage	m_PageMod;
 	TMenuPage	m_PageFXChain;
+	TMenuPage	m_PageCloudSeed;	// FX slot 0 param page
 	TMenuPage	m_PageMidiFX;
 	TMenuPage	m_PagePresets;
 	TMenuPage	m_PageSettings;
