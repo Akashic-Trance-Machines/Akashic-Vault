@@ -1,0 +1,22 @@
+# config.txt — Akashic Vault (Circle bare-metal)
+#
+# One SD card serves both boards: the Pi3 loads kernel8.img and the Pi4 loads
+# kernel8-rpi4.img automatically. Circle does not use an armstub on Pi3.
+
+arm_64bit=1
+kernel=kernel8.img
+
+# Keep the GPU/CPU split small — we use I2S, not HDMI audio.
+gpu_mem=64
+
+# I2S audio out (DAC on the HAT). Circle drives I2S directly.
+dtparam=i2s=on
+
+# Disable Bluetooth and explicitly enable PL011 UART on GPIO14/15 for TRS MIDI.
+dtoverlay=disable-bt
+enable_uart=1
+
+# Pi4-specific: ensure the same image works; Pi4 picks kernel8-rpi4.img.
+[pi4]
+arm_boost=1
+[all]

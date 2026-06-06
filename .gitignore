@@ -1,0 +1,16 @@
+# Build outputs
+build/
+sdcard/
+*.o
+*.d
+*.elf
+*.lst
+*.map
+*.img
+
+# macOS
+.DS_Store
+
+# Editor / agent config
+.claude/
+*.local

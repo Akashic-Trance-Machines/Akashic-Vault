@@ -1,0 +1,9 @@
+[submodule "circle-stdlib"]
+	path = circle-stdlib
+	url = https://github.com/smuehlst/circle-stdlib.git
+[submodule "CMSIS_5"]
+	path = CMSIS_5
+	url = https://github.com/ARM-software/CMSIS_5.git
+[submodule "src/modules/generators/plaits"]
+	path = src/modules/generators/plaits
+	url = https://github.com/Akashic-Trance-Machines/AV-Plaits.git

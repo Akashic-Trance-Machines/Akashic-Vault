@@ -1,0 +1,12 @@
+{
+  "id": "braids", "name": "Braids", "kind": "generator", "version": 1,
+  "credits": "Mutable Instruments (Emilie Gillet); port: charlesvestal",
+  "license": "MIT",
+  "params": [
+    { "id": "shape", "label": "Shape", "type": "enum", "default": 0,
+      "options": ["CSAW","Morph","SawSquare","SineTri","Buzz"] },
+    { "id": "timbre", "label": "Timbre", "type": "int", "min": 0, "max": 127, "default": 64, "step": 1, "display": "raw" },
+    { "id": "color", "label": "Color", "type": "float", "min": 0.0, "max": 1.0, "default": 0.5, "display": "percent" }
+  ],
+  "menu": [ { "page": "Main", "items": ["shape","timbre","color"] } ]
+}
