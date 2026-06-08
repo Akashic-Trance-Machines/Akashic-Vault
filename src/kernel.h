@@ -140,7 +140,7 @@ private:
 	TMenuPage	m_PagePresets;
 	TMenuPage	m_PageSettings;
 
-	static constexpr unsigned MAX_MENU_ROWS = 48;
+	static constexpr unsigned MAX_MENU_ROWS = 96;
 	TMenuRow	m_MenuRows[MAX_MENU_ROWS];
 	unsigned	m_nMenuRowCount;
 

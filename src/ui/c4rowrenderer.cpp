@@ -42,7 +42,9 @@ void C4RowRenderer::Init ()
 {
 	lv_obj_t *scr = lv_screen_active ();
 
-	// Screen style: black background, white text (already set in kernel.cpp).
+	// Zero screen padding so lv_obj_set_pos() maps directly to pixels.
+	lv_obj_set_style_pad_all (scr, 0, LV_PART_MAIN);
+	lv_obj_set_style_border_width (scr, 0, LV_PART_MAIN);
 
 	// ── Scrollbar ─────────────────────────────────────────────────────────
 	m_pScrollbar = lv_obj_create (scr);
@@ -63,9 +65,14 @@ void C4RowRenderer::Init ()
 		lv_obj_set_pos  (m_pRowLabel[i], TEXT_X, rowY);
 		lv_obj_set_size (m_pRowLabel[i], TEXT_W, ROW_H);
 		lv_label_set_long_mode (m_pRowLabel[i], LV_LABEL_LONG_CLIP);
-		lv_obj_set_style_text_color (m_pRowLabel[i], lv_color_white (), LV_PART_MAIN);
-		lv_obj_set_style_bg_opa     (m_pRowLabel[i], LV_OPA_TRANSP,    LV_PART_MAIN);
-		lv_obj_set_style_pad_all    (m_pRowLabel[i], 0,                LV_PART_MAIN);
+		lv_obj_set_style_text_color  (m_pRowLabel[i], lv_color_white (), LV_PART_MAIN);
+		// Opaque black bg (not transparent): I1 mode needs an explicit bg
+		// fill before drawing glyph pixels, otherwise text is invisible.
+		lv_obj_set_style_bg_color    (m_pRowLabel[i], lv_color_black (), LV_PART_MAIN);
+		lv_obj_set_style_bg_opa      (m_pRowLabel[i], LV_OPA_COVER,     LV_PART_MAIN);
+		lv_obj_set_style_border_width(m_pRowLabel[i], 0,                LV_PART_MAIN);
+		lv_obj_set_style_pad_all     (m_pRowLabel[i], 0,                LV_PART_MAIN);
+		lv_obj_set_style_radius      (m_pRowLabel[i], 0,                LV_PART_MAIN);
 		lv_label_set_text (m_pRowLabel[i], "");
 
 		// ── Action icon: white box ─────────────────────────────────────
