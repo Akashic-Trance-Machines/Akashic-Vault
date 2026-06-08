@@ -92,6 +92,11 @@ YKCHORUS_DIR = modules/audiofx/ykchorus
 OBJS += \
 	$(YKCHORUS_DIR)/src/ykchorus_fx.o
 
+# ── AV-Arp (MIDI arpeggiator, original implementation, GPL-3.0) ─────────────
+ARP_DIR = modules/midifx/arp
+OBJS += \
+	$(ARP_DIR)/src/arp_midifx.o
+
 EXTRACLEAN = $(OBJS) $(OBJS:.o=.d)
 
 # ── Version stamp ─────────────────────────────────────────────────────────────
@@ -123,6 +128,8 @@ INCLUDE += -I $(CLOUDSEED_CORE)/.. -I $(CLOUDSEED_DIR)/src -I $(CLOUDSEED_DIR)/c
 CFLAGS += -include cstdlib
 # YKChorus: vendored core headers + src wrapper.
 INCLUDE += -I $(YKCHORUS_DIR)/core -I $(YKCHORUS_DIR)/src
+# AV-Arp: src wrapper only (original implementation, no vendored core).
+INCLUDE += -I $(ARP_DIR)/src
 
 # ── Libraries (order matters for the GNU linker) ──────────────────────────────
 # NOTE: confirm the exact set/paths against the vendored circle-stdlib version.

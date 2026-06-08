@@ -38,6 +38,7 @@
 #include "modules/generators/plaits/src/plaits_generator.h"
 #include "modules/audiofx/cloudseed/src/cloudseed_fx.h"
 #include "modules/audiofx/ykchorus/src/ykchorus_fx.h"
+#include "modules/midifx/arp/src/arp_midifx.h"
 
 enum TShutdownMode { ShutdownNone, ShutdownHalt, ShutdownReboot };
 
@@ -105,6 +106,9 @@ private:
 	CCloudSeedFX		m_CloudSeed;
 	CYKChorusFX		m_YKChorus;
 
+	// ── MIDI FX instances ─────────────────────────────────────────────────
+	CArpMidiFX		m_Arp;
+
 	// ── 4-row UI ──────────────────────────────────────────────────────────
 	C4RowUI			m_UI;
 
@@ -154,6 +158,7 @@ private:
 	TMenuPage	m_PageYKChorus;
 	TMenuPage	m_PageCloudSeed;	// FX slot 0 param page
 	TMenuPage	m_PageMidiFX;
+	TMenuPage	m_PageArp;	// Arpeggiator param page
 	TMenuPage	m_PagePresets;
 	TMenuPage	m_PageSettings;
 

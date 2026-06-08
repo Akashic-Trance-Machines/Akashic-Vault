@@ -133,6 +133,12 @@ boolean CKernel::Initialize ()
 	m_Engine.SetAudioFXDirect (0, &m_CloudSeed);
 	LOGNOTE ("FX ready: CloudSeed + YKChorus");
 
+	// ── MIDI FX init (slot 0 = Arpeggiator, off by default) ──────────────────
+	m_Arp.Init (48000, MAX_BLOCK);
+	m_Engine.SetMidiFXDirect (0, &m_Arp);
+	m_Engine.SetTempo (120.0f);
+	LOGNOTE ("MIDI FX ready: Arpeggiator");
+
 	// ── I2S audio ─────────────────────────────────────────────────────────────
 	m_I2SAudio.SetEngine (&m_Engine);
 	if (bOK && !m_I2SAudio.Start ())
@@ -356,9 +362,18 @@ void CKernel::BuildMenus ()
 		m_PageFXChain.pRows[m_PageFXChain.nRows++] = r;
 	}
 
-	// ── MIDI FX page (stubs) ──────────────────────────────────────────────
+	// ── Arpeggiator param page (all params, scrollable) ──────────────────
+	InitPage (&m_PageArp, "Arpeggiator", &m_PageMidiFX);
+	for (unsigned i = 0; i < m_Arp.NumParams (); i++)
+		MakeParamRow (&m_PageArp, &m_Arp, i);
+
+	// ── MIDI FX page ──────────────────────────────────────────────────────
+	// "Arp" toggles the module on/off right here (param 0 = enable); diving
+	// into "Arp Settings" reaches Mode/Octaves/Rate/Gate. Chord is a stub —
+	// next on the Phase 5 porting list (Eucalypso / chord generator).
 	InitPage (&m_PageMidiFX, "MIDI FX", &m_PageOSRoot);
-	MakeReadOnlyRow (&m_PageMidiFX, "Arpeggiator", "Off");
+	MakeParamRow    (&m_PageMidiFX, &m_Arp, 0);			// enable (On/Off)
+	MakeMenuRow     (&m_PageMidiFX, "Arp Settings", &m_PageArp);
 	MakeReadOnlyRow (&m_PageMidiFX, "Chord",        "Off");
 
 	// ── Presets page (stubs) ──────────────────────────────────────────────
@@ -394,6 +409,7 @@ TShutdownMode CKernel::Run ()
 
 		PollMidi ();
 		PollInput ();
+		m_Engine.Tick (m_Timer.GetClockTicks ());	// drives clock-synced MIDI FX (arp)
 		m_UI.Draw ();
 
 		m_GUI.Update ();

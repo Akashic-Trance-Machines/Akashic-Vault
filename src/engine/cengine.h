@@ -43,15 +43,29 @@ public:
 	void	SetAudioFXDirect (unsigned nFxSlot, IAudioFX *pFX);	// direct injection
 	bool	AddMidiFX (const char *pModuleId);
 	void	ClearMidiFX ();
+	// Direct injection — for pre-constructed instances (not owned by engine,
+	// caller keeps ownership e.g. as a CKernel member). pFX may be nullptr to
+	// clear the slot.
+	void	SetMidiFXDirect (unsigned nSlot, IMidiFX *pFX);
+	IMidiFX	*MidiFX (unsigned nSlot);
 
 	ISoundGenerator	*Generator (unsigned nSlot);
 	IAudioFX	*AudioFX (unsigned nFxSlot);
 	void		 SetFXBypass (unsigned nFxSlot, bool bBypass);
 
 	// ── MIDI input (from TRS + USB routers) ──────────────────────────────────
-	// Pushed events are run through the MIDI FX chain, then dispatched to the
-	// generator(s) by channel. Lock-free queue read by the audio block.
+	// Pushed events are run through the MIDI FX chain (each stage's output
+	// feeds the next stage's input), then the survivors are dispatched to the
+	// generator(s) by channel. Called from the main loop / MIDI poll context —
+	// NOT the audio IRQ (matches ISoundGenerator::HandleMidi's contract).
 	void	PushMidi (const TMidiEvent &Event);
+
+	// Drives clock-synced MIDI FX (arpeggiators, sequencers, ...). Call once
+	// per main-loop iteration with CTimer::GetClockTicks() (microseconds);
+	// the engine derives a sample-clock estimate from the elapsed time and
+	// feeds it to each MIDI FX's Tick(). Generated events run through the
+	// remaining downstream MIDI FX stages, then reach the generator(s).
+	void	Tick (uint32_t nNowUs);
 
 	// ── Clock ─────────────────────────────────────────────────────────────────
 	void	SetClockSource (ClockSource Source);
@@ -66,6 +80,12 @@ private:
 	void	DrainMidi (unsigned nFrames);	// apply queued MIDI for this block
 	void	AdvanceClock (unsigned nFrames);
 
+	// Run one event through MIDI FX stages [nStartStage..end), chaining each
+	// stage's output into the next stage's input, then dispatch survivors to
+	// the matching generator(s). No heap — small fixed scratch buffers.
+	void	RunMidiFXChain (const TMidiEvent &Event, unsigned nStartStage);
+	void	DispatchToGenerators (const TMidiEvent *pEvents, unsigned nCount);
+
 private:
 	unsigned	m_nSampleRate = 48000;
 	unsigned	m_nBlock      = MAX_BLOCK;
@@ -79,6 +99,15 @@ private:
 
 	IMidiFX		*m_pMidiFX[MAX_MIDI_FX] = {};
 	unsigned	 m_nMidiFX = 0;
+
+	// MIDI FX clock — derives a sample-clock estimate from wall-clock deltas
+	// (CTimer::GetClockTicks(), microseconds) supplied via Tick(). Driving the
+	// MIDI FX chain from the main loop keeps it out of the audio IRQ, matching
+	// ISoundGenerator::HandleMidi's "called outside the render" contract.
+	static constexpr unsigned MAX_CHAIN_EVENTS = 8;
+	uint32_t	 m_nMidiClockSamples = 0;	// running sample-clock estimate
+	uint32_t	 m_nLastTickUs       = 0;
+	bool		 m_bClockStarted     = false;
 
 	ClockSource	 m_ClockSource = ClockSource::Internal;
 	float		 m_fTempoBPM   = 120.0f;
