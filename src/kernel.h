@@ -37,6 +37,7 @@
 #include "ui/c4rowui.h"
 #include "modules/generators/plaits/src/plaits_generator.h"
 #include "modules/audiofx/cloudseed/src/cloudseed_fx.h"
+#include "modules/audiofx/ykchorus/src/ykchorus_fx.h"
 
 enum TShutdownMode { ShutdownNone, ShutdownHalt, ShutdownReboot };
 
@@ -100,8 +101,9 @@ private:
 	// ── Generators ────────────────────────────────────────────────────────
 	CPlaitsGenerator	m_Plaits;
 
-	// ── Audio FX ──────────────────────────────────────────────────────────
-	CCloudSeedFX		m_CloudSeed;	// FX slot 0
+	// ── Audio FX instances ────────────────────────────────────────────────
+	CCloudSeedFX		m_CloudSeed;
+	CYKChorusFX		m_YKChorus;
 
 	// ── 4-row UI ──────────────────────────────────────────────────────────
 	C4RowUI			m_UI;
@@ -120,6 +122,20 @@ private:
 	unsigned		m_nClickCount[5];	// [0-3]=enc1-4 clicks, [4]=back
 	unsigned		m_nLastDetentTick[5];	// CTimer tick of last detent per encoder (for acceleration)
 
+	// ── FX slot selection ────────────────────────────────────────────────────
+	// 0 = None, 1 = CloudSeed, 2 = YKChorus
+	unsigned		m_nFXSlot[3];
+	void		ApplyFXSlot   (unsigned nSlot);
+	void		AdjustFXSlot  (unsigned nSlot, int nDelta);
+	const char	*GetFXSlotName (unsigned nSlot) const;
+	void		NavigateToFXParams (unsigned nSlot);
+
+	struct TFXSlotCtx { CKernel *pKernel; unsigned nSlot; };
+	TFXSlotCtx		m_FXSlotCtx[3];
+	static void	FXSlotAdjust (void *pCtx, int nDelta);
+	static void	FXSlotGetStr (void *pCtx, char *pBuf, unsigned nMax);
+	static void	FXSlotAction (void *pCtx);
+
 	// ── Master volume (0–100, applied in CI2SAudio) ──────────────────────────
 	unsigned	m_nVolume;	// 0–100
 	void		AdjustVolume (int nDelta);
@@ -135,6 +151,7 @@ private:
 	TMenuPage	m_PageTone;
 	TMenuPage	m_PageMod;
 	TMenuPage	m_PageFXChain;
+	TMenuPage	m_PageYKChorus;
 	TMenuPage	m_PageCloudSeed;	// FX slot 0 param page
 	TMenuPage	m_PageMidiFX;
 	TMenuPage	m_PagePresets;

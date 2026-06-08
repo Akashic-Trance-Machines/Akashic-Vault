@@ -26,6 +26,7 @@ public:
 	void	NavDown ();
 	void	NavBack ();
 	void	GoToRoot ();
+	void	NavigateToPage (TMenuPage *pPage);
 	void	EncoderDelta (unsigned nEncoder, int nDelta);	// 0-3 = enc1-4
 	void	EncoderClick (unsigned nEncoder);
 

@@ -87,6 +87,11 @@ OBJS += \
 	$(CLOUDSEED_CORE)/DSP/RandomBuffer.o \
 	$(CLOUDSEED_CORE)/Parameters.o
 
+# ── AV-YKChorus (TAL Juno-60 chorus, GPL-2.0 core, header-only) ──────────────
+YKCHORUS_DIR = modules/audiofx/ykchorus
+OBJS += \
+	$(YKCHORUS_DIR)/src/ykchorus_fx.o
+
 EXTRACLEAN = $(OBJS) $(OBJS:.o=.d)
 
 # ── Version stamp ─────────────────────────────────────────────────────────────
@@ -116,6 +121,8 @@ INCLUDE += -I $(PLAITS_CORE) -I $(PLAITS_DIR)/src
 # Force-include cstdlib so std::rand in the core compiles without patching it.
 INCLUDE += -I $(CLOUDSEED_CORE)/.. -I $(CLOUDSEED_DIR)/src -I $(CLOUDSEED_DIR)/core/compat
 CFLAGS += -include cstdlib
+# YKChorus: vendored core headers + src wrapper.
+INCLUDE += -I $(YKCHORUS_DIR)/core -I $(YKCHORUS_DIR)/src
 
 # ── Libraries (order matters for the GNU linker) ──────────────────────────────
 # NOTE: confirm the exact set/paths against the vendored circle-stdlib version.

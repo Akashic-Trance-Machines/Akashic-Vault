@@ -52,6 +52,7 @@ CKernel::CKernel ()
 	m_nDispMidi {0, 0, 0},
 	m_nMidiCount (0),
 	m_nVolume (80),
+	m_nFXSlot {1, 0, 0},	// FX1=CloudSeed, FX2=None, FX3=None
 	m_bNavHeld (FALSE),
 	m_nNavHoldStart (0),
 	m_bNavLongFired (FALSE),
@@ -123,9 +124,14 @@ boolean CKernel::Initialize ()
 	m_Engine.SetGeneratorDirect (0, &m_Plaits);
 	LOGNOTE ("Plaits loaded — 24 engines ready");
 
+	// ── Audio FX init (FX slot 0 = CloudSeed by default) ─────────────────────
 	m_CloudSeed.Init (48000, MAX_BLOCK);
+	m_YKChorus.Init  (48000, MAX_BLOCK);
+	m_nFXSlot[0] = 1;	// CloudSeed
+	m_nFXSlot[1] = 0;	// None
+	m_nFXSlot[2] = 0;	// None
 	m_Engine.SetAudioFXDirect (0, &m_CloudSeed);
-	LOGNOTE ("CloudSeed loaded");
+	LOGNOTE ("FX ready: CloudSeed + YKChorus");
 
 	// ── I2S audio ─────────────────────────────────────────────────────────────
 	m_I2SAudio.SetEngine (&m_Engine);
@@ -233,6 +239,66 @@ void CKernel::AdjustVolume (int nDelta)
 	m_I2SAudio.SetVolume ((float) m_nVolume / 100.0f);
 }
 
+// ── FX slot selection ─────────────────────────────────────────────────────────
+
+static const char *const s_FXNames[] = { "None", "CloudSeed", "YKChorus" };
+static constexpr unsigned NUM_FX_ALGOS = 3;
+
+void CKernel::ApplyFXSlot (unsigned nSlot)
+{
+	IAudioFX *pFX = nullptr;
+	switch (m_nFXSlot[nSlot])
+	{
+		case 1: pFX = &m_CloudSeed; break;
+		case 2: pFX = &m_YKChorus;  break;
+		default: break;
+	}
+	m_Engine.SetAudioFXDirect (nSlot, pFX);
+}
+
+void CKernel::AdjustFXSlot (unsigned nSlot, int nDelta)
+{
+	unsigned &sel = m_nFXSlot[nSlot];
+	if (nDelta > 0)
+		sel = (sel + 1) % NUM_FX_ALGOS;
+	else if (nDelta < 0)
+		sel = (sel == 0) ? NUM_FX_ALGOS - 1 : sel - 1;
+	ApplyFXSlot (nSlot);
+}
+
+const char *CKernel::GetFXSlotName (unsigned nSlot) const
+{
+	return s_FXNames[m_nFXSlot[nSlot] < NUM_FX_ALGOS ? m_nFXSlot[nSlot] : 0];
+}
+
+void CKernel::NavigateToFXParams (unsigned nSlot)
+{
+	switch (m_nFXSlot[nSlot])
+	{
+		case 1: m_UI.NavigateToPage (&m_PageCloudSeed); break;
+		case 2: m_UI.NavigateToPage (&m_PageYKChorus);  break;
+		default: break;
+	}
+}
+
+void CKernel::FXSlotAdjust (void *pCtx, int nDelta)
+{
+	static_cast<TFXSlotCtx *> (pCtx)->pKernel->AdjustFXSlot (
+		static_cast<TFXSlotCtx *> (pCtx)->nSlot, nDelta);
+}
+
+void CKernel::FXSlotGetStr (void *pCtx, char *pBuf, unsigned nMax)
+{
+	auto *c = static_cast<TFXSlotCtx *> (pCtx);
+	snprintf (pBuf, nMax, "%s", c->pKernel->GetFXSlotName (c->nSlot));
+}
+
+void CKernel::FXSlotAction (void *pCtx)
+{
+	auto *c = static_cast<TFXSlotCtx *> (pCtx);
+	c->pKernel->NavigateToFXParams (c->nSlot);
+}
+
 // ── BuildMenus ────────────────────────────────────────────────────────────────
 
 void CKernel::BuildMenus ()
@@ -260,16 +326,35 @@ void CKernel::BuildMenus ()
 	MakeMenuRow     (&m_PageSoundGen, "Tone",    &m_PageTone);
 	MakeMenuRow     (&m_PageSoundGen, "Mod",     &m_PageMod);
 
-	// ── CloudSeed param page (all 46 params, scrollable) ─────────────────
+	// ── CloudSeed param page (all params, scrollable) ────────────────────
 	InitPage (&m_PageCloudSeed, "CloudSeed", &m_PageFXChain);
 	for (unsigned i = 0; i < m_CloudSeed.NumParams (); i++)
 		MakeParamRow (&m_PageCloudSeed, &m_CloudSeed, i);
 
-	// ── FX Chain page ─────────────────────────────────────────────────────
+	// ── YKChorus param page ───────────────────────────────────────────────
+	InitPage (&m_PageYKChorus, "YKChorus", &m_PageFXChain);
+	for (unsigned i = 0; i < m_YKChorus.NumParams (); i++)
+		MakeParamRow (&m_PageYKChorus, &m_YKChorus, i);
+
+	// ── FX Chain page — 3 selector rows ──────────────────────────────────
+	// Encoder cycles through None/CloudSeed/YKChorus and immediately wires
+	// the engine. Encoder click navigates to that algorithm's param page.
 	InitPage (&m_PageFXChain, "FX Chain", &m_PageOSRoot);
-	MakeMenuRow  (&m_PageFXChain, "FX1: CloudSeed", &m_PageCloudSeed);
-	MakeReadOnlyRow (&m_PageFXChain, "FX2", "None");
-	MakeReadOnlyRow (&m_PageFXChain, "FX3", "None");
+	static const char *s_FXSlotLabels[3] = { "FX1", "FX2", "FX3" };
+	for (unsigned i = 0; i < 3; i++)
+	{
+		m_FXSlotCtx[i] = { this, i };
+		TMenuRow *r = AllocRow (); if (!r) break;
+		r->type       = TMenuRowType::Property;
+		r->pLabel     = s_FXSlotLabels[i];
+		r->bHasAction = true;
+		r->pfAdjust   = FXSlotAdjust;
+		r->pfGetStr   = FXSlotGetStr;
+		r->pFreeCtx   = &m_FXSlotCtx[i];
+		r->pfAction   = FXSlotAction;
+		r->pActionCtx = &m_FXSlotCtx[i];
+		m_PageFXChain.pRows[m_PageFXChain.nRows++] = r;
+	}
 
 	// ── MIDI FX page (stubs) ──────────────────────────────────────────────
 	InitPage (&m_PageMidiFX, "MIDI FX", &m_PageOSRoot);

@@ -94,9 +94,9 @@ void CEngine::ClearMidiFX ()
 
 void CEngine::SetAudioFXDirect (unsigned nFxSlot, IAudioFX *pFX)
 {
-	if (nFxSlot >= NUM_FX_SLOTS || !pFX)
+	if (nFxSlot >= NUM_FX_SLOTS)
 		return;
-	// Don't delete — not owned. Caller keeps ownership.
+	// pFX may be nullptr to clear the slot. Not owned — caller keeps ownership.
 	m_pFX[nFxSlot] = pFX;
 }
 

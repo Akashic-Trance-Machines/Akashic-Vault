@@ -2,22 +2,19 @@
 
 ## Input
 
-### Encoder acceleration
-When twisting faster, increment in larger steps so full-range sweeps don't require many rotations.
+### ✅ Encoder acceleration — DONE
+Inter-detent interval measured via `CTimer::GetTicks()` in `PollInput()`.
+Multiplier: `<20ms → 10×`, `20-50ms → 5×`, `50-150ms → 2×`, `>150ms → 1×`.
+Enum/Bool params clamped to ±1 in `C4RowMenu::EncoderDelta()`.
+Nav encoder never accelerated (scroll jumps would feel wrong).
 
-- Measure inter-detent interval per encoder using `CTimer::GetTicks()`
-- Map interval → multiplier: `<20ms → 10×`, `20–80ms → 3×`, `>80ms → 1×`
-- Apply in `C4RowMenu::EncoderDelta()` before min/max clamp
-- Skip acceleration for enum params (e.g. engine selector) — single-step only
-- Location: `src/kernel.cpp` PollInput() + `src/ui/c4rowmenu.cpp` EncoderDelta()
+### ✅ Encoder pulse-per-step PEC11R-4020F-S0024 — DONE
+`STEPS_PER_DETENT = 2` in `src/kernel.cpp`.
+`EncoderPulsePerStep=2` in `config/av-vault.ini`.
+Reading from ini at runtime is a future improvement.
 
-### Encoder pulse-per-step — PEC11R-4020F-S0024
-Currently hardcoded `STEPS_PER_DETENT = 3` in `src/kernel.cpp`.
-The PEC11R-4020F-S0024 has **24 detents/rev** — verify the correct quadrature
-transition count per detent on hardware and make it configurable via `av-vault.ini`
-(`EncoderPulsePerStep=` is already in the config, just not read at runtime yet).
+## AV-Plaits
 
-- Read `EncoderPulsePerStep` from `av-vault.ini` at boot via `CPropertiesFatFsFile`
-- Pass to `PollInput()` instead of the compile-time constant
-- Document: PEC11R-4020F-S0024 = 24 detents, 2 pulses/detent → `EncoderPulsePerStep=2`
-  (adjust if hardware testing shows otherwise)
+### Polyphony
+Add N `plaits::Voice` instances + stmlib `VoiceAllocator` for proper polyphony.
+Currently monophonic — only one note sounds at a time.

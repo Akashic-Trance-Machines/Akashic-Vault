@@ -67,6 +67,12 @@ void C4RowMenu::GoToRoot ()
 		Navigate (m_pRoot);
 }
 
+void C4RowMenu::NavigateToPage (TMenuPage *pPage)
+{
+	if (pPage)
+		Navigate (pPage);
+}
+
 void C4RowMenu::EncoderDelta (unsigned nRow, int nDelta)
 {
 	TMenuRow *pRow = VisibleRow (nRow);

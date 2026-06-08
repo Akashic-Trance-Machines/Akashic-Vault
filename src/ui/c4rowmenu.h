@@ -82,6 +82,7 @@ public:
 	void		NavDown ();		// scroll down
 	void		NavBack ();		// go up one level
 	void		GoToRoot ();		// jump to root from anywhere (long-press)
+	void		NavigateToPage (TMenuPage *pPage);	// jump to any page
 	void		EncoderDelta (unsigned nRow, int nDelta); // value encoder
 	void		EncoderClick (unsigned nRow);		  // value encoder click
 

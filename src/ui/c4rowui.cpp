@@ -20,6 +20,7 @@ void C4RowUI::NavUp ()             { m_Menu.NavUp (); }
 void C4RowUI::NavDown ()           { m_Menu.NavDown (); }
 void C4RowUI::NavBack ()           { m_Menu.NavBack (); }
 void C4RowUI::GoToRoot ()          { m_Menu.GoToRoot (); }
+void C4RowUI::NavigateToPage (TMenuPage *pPage) { m_Menu.NavigateToPage (pPage); }
 
 void C4RowUI::EncoderDelta (unsigned nEncoder, int nDelta)
 {

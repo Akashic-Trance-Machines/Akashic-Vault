@@ -10,3 +10,6 @@
 [submodule "src/modules/audiofx/cloudseed"]
 	path = src/modules/audiofx/cloudseed
 	url = https://github.com/Akashic-Trance-Machines/AV-CloudSeed.git
+[submodule "src/modules/audiofx/ykchorus"]
+	path = src/modules/audiofx/ykchorus
+	url = https://github.com/Akashic-Trance-Machines/AV-YKChorus.git
