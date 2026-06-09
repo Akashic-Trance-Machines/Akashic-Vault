@@ -158,7 +158,9 @@ void CEngine::DispatchToGenerators (const TMidiEvent *pEvents, unsigned nCount)
 {
 	for (unsigned i = 0; i < nCount; i++)
 		for (unsigned g = 0; g < m_nGenerators; g++)
-			if (m_pGen[g] && m_GenChannel[g] == pEvents[i].nChannel)
+			if (m_pGen[g] &&
+			    (m_GenChannel[g] == 0xFF ||		// 0xFF = OMNI: receive all channels
+			     m_GenChannel[g] == pEvents[i].nChannel))
 				m_pGen[g]->HandleMidi (pEvents[i]);
 }
 

@@ -46,8 +46,8 @@ CKernel::CKernel ()
 	m_nMidiParseStatus (0),
 	m_nMidiParseData0 (0),
 	m_nMidiParseIdx (0),
-	m_bMidiPending (FALSE),
-	m_nLastMidi {0, 0, 0},
+	m_nMidiQWrite (0),
+	m_nMidiQRead (0),
 	m_bUsbMidiFound (FALSE),
 	m_nDispMidi {0, 0, 0},
 	m_nMidiCount (0),
@@ -604,11 +604,16 @@ void CKernel::PollMidi ()
 		}
 	}
 
-	// ── Drain USB MIDI pending event ─────────────────────────────────────────
-	if (m_bMidiPending)
+	// ── Drain USB MIDI FIFO (all queued events, not just the latest) ─────────
+	// The USB callback is SPSC-safe: it only advances m_nMidiQWrite and we
+	// only advance m_nMidiQRead, so no lock is needed — just a memory barrier
+	// to ensure we read packet bytes before the write-index update is visible.
+	while (m_nMidiQRead != m_nMidiQWrite)
 	{
-		m_bMidiPending = FALSE;
-		DispatchMidi (m_nLastMidi[0], m_nLastMidi[1], m_nLastMidi[2]);
+		__sync_synchronize ();		// load-acquire: see packet bytes before index
+		unsigned nR = m_nMidiQRead;
+		DispatchMidi (m_MidiQueue[nR][0], m_MidiQueue[nR][1], m_MidiQueue[nR][2]);
+		m_nMidiQRead = (nR + 1) & (MIDI_QUEUE_SIZE - 1);
 	}
 
 	// ── Drain TRS UART ring buffer ────────────────────────────────────────────
@@ -660,8 +665,16 @@ void CKernel::UsbMidiPacketHandler (unsigned /*nCable*/, u8 *pPacket,
 		return;
 
 	CKernel *pThis = static_cast<CKernel *> (pParam);
-	pThis->m_nLastMidi[0] = pPacket[0];
-	pThis->m_nLastMidi[1] = nLength > 1 ? pPacket[1] : 0;
-	pThis->m_nLastMidi[2] = nLength > 2 ? pPacket[2] : 0;
-	pThis->m_bMidiPending  = TRUE;
+
+	unsigned nW    = pThis->m_nMidiQWrite;
+	unsigned nNext = (nW + 1) & (MIDI_QUEUE_SIZE - 1);
+
+	if (nNext == pThis->m_nMidiQRead)
+		return;		// queue full — drop rather than corrupt
+
+	pThis->m_MidiQueue[nW][0] = pPacket[0];
+	pThis->m_MidiQueue[nW][1] = nLength > 1 ? pPacket[1] : 0;
+	pThis->m_MidiQueue[nW][2] = nLength > 2 ? pPacket[2] : 0;
+	__sync_synchronize ();		// store-release: ensure bytes visible before index
+	pThis->m_nMidiQWrite = nNext;
 }

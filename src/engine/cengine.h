@@ -91,7 +91,9 @@ private:
 	unsigned	m_nBlock      = MAX_BLOCK;
 
 	ISoundGenerator	*m_pGen[MAX_GENERATORS]   = {};
-	uint8_t		 m_GenChannel[MAX_GENERATORS] = {};	// MIDI ch per gen
+	uint8_t		 m_GenChannel[MAX_GENERATORS] =
+		{ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+				// MIDI ch per generator, 0xFF = OMNI (receive all channels)
 	unsigned	 m_nGenerators = 0;
 
 	IAudioFX	*m_pFX[NUM_FX_SLOTS] = {};

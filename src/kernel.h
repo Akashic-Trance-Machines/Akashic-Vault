@@ -175,9 +175,12 @@ private:
 	u8			m_nMidiParseData0;
 	u8			m_nMidiParseIdx;	// 1 = waiting d1, 2 = waiting d2
 
-	// USB MIDI: incoming packet flag (set from USB IRQ, cleared in main loop).
-	volatile boolean	m_bMidiPending;
-	volatile u8		m_nLastMidi[3];		// [0]=status [1]=d1 [2]=d2
+	// USB MIDI: SPSC ring buffer (USB callback writes, PollMidi reads).
+	// Power-of-two size so wrap is a cheap bitwise AND.
+	static constexpr unsigned MIDI_QUEUE_SIZE = 32;
+	u8		 m_MidiQueue[MIDI_QUEUE_SIZE][3];	// [n][0]=status [n][1]=d1 [n][2]=d2
+	volatile unsigned m_nMidiQWrite;	// head — written only by USB callback
+	volatile unsigned m_nMidiQRead;		// tail — written only by PollMidi
 
 	// USB MIDI device (found lazily in PollMidi).
 	boolean			m_bUsbMidiFound;
