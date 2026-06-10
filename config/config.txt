@@ -16,7 +16,11 @@ dtparam=i2s=on
 dtoverlay=disable-bt
 enable_uart=1
 
-# Pi4-specific: ensure the same image works; Pi4 picks kernel8-rpi4.img.
+# Pi4-specific overrides.
+# IMPORTANT: must explicitly set kernel= here — the global kernel=kernel8.img
+# is otherwise inherited and loads the Pi3 build on Pi4 (wrong peripheral base
+# address 0x3F000000 vs 0xFE000000 → OLED/I2S/MIDI all silent).
 [pi4]
 arm_boost=1
+kernel=kernel8-rpi4.img
 [all]
