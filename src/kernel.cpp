@@ -75,12 +75,19 @@ boolean CKernel::Initialize ()
 {
 	boolean bOK = TRUE;
 
-	if (bOK) bOK = m_Screen.Initialize ();
+	// HDMI screen is debug/log output only — headless operation (no monitor
+	// attached) is normal.  Do NOT gate bOK on it: CScreenDevice::Initialize()
+	// returns false when no display is detected on Pi4, which would silently
+	// poison bOK and kill the entire boot (I2C, I2S, OLED, everything).
+	boolean bScreenOK = m_Screen.Initialize ();
 	if (bOK)
 	{
+		// Log to the configured device; fall back to HDMI if available;
+		// if no target at all, the logger discards output but boot continues.
 		CDevice *pTarget = m_DeviceNameService.GetDevice (m_Options.GetLogDevice (), FALSE);
-		if (!pTarget) pTarget = &m_Screen;
-		bOK = m_Logger.Initialize (pTarget);
+		if (!pTarget && bScreenOK) pTarget = &m_Screen;
+		if (pTarget) m_Logger.Initialize (pTarget);
+		// Logger failure is non-fatal — we're running headless.
 	}
 	if (bOK) bOK = m_Interrupt.Initialize ();
 	if (bOK) bOK = m_Timer.Initialize ();
