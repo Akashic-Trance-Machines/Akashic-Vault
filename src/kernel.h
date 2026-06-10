@@ -33,6 +33,7 @@
 #include <circle/usb/usbmidi.h>
 
 #include "engine/cengine.h"
+#include "engine/cmodrouter.h"
 #include "platform/ci2saudio.h"
 #include "ui/c4rowui.h"
 #include "modules/generators/plaits/src/plaits_generator.h"
@@ -109,6 +110,9 @@ private:
 	// ── MIDI FX instances ─────────────────────────────────────────────────
 	CArpMidiFX		m_Arp;
 
+	// ── Mod router (2 LFOs + 2 cyclic envelopes → Plaits live mod) ────────
+	CModRouter		m_ModRouter;
+
 	// ── 4-row UI ──────────────────────────────────────────────────────────
 	C4RowUI			m_UI;
 
@@ -153,18 +157,43 @@ private:
 	TMenuPage	m_PageOSRoot;
 	TMenuPage	m_PageSoundGen;
 	TMenuPage	m_PageTone;
-	TMenuPage	m_PageMod;
+	TMenuPage	m_PageMod;		// Sound Gen → Mod (FM/timbre/morph amounts)
 	TMenuPage	m_PageFXChain;
 	TMenuPage	m_PageYKChorus;
 	TMenuPage	m_PageCloudSeed;	// FX slot 0 param page
 	TMenuPage	m_PageMidiFX;
-	TMenuPage	m_PageArp;	// Arpeggiator param page
+	TMenuPage	m_PageArp;		// Arpeggiator param page
 	TMenuPage	m_PagePresets;
 	TMenuPage	m_PageSettings;
+	// ── Mod router pages (top-level "Mod" item) ───────────────────────────
+	TMenuPage	m_PageModMain;		// LFO1 / LFO2 / Env1 / Env2
+	TMenuPage	m_PageModLFO[2];	// Rate, Shape, Depth, Target
+	TMenuPage	m_PageModEnv[2];	// Attack, Decay, Depth, Target
 
-	static constexpr unsigned MAX_MENU_ROWS = 96;
+	static constexpr unsigned MAX_MENU_ROWS = 128;
 	TMenuRow	m_MenuRows[MAX_MENU_ROWS];
 	unsigned	m_nMenuRowCount;
+
+	// ── Mod router UI contexts ────────────────────────────────────────────────
+	// sources: 0-1 = LFO 0-1,  2-3 = Env 0-1
+	// params:  LFO: 0=Rate 1=Shape 2=Depth 3=Target
+	//          Env: 0=Attack 1=Decay 2=Depth 3=Target
+	struct TModParamCtx { CKernel *pKernel; unsigned nSrc; unsigned nParam; };
+	TModParamCtx	m_ModParamCtx[4][4];
+	static void	ModParamAdjust (void *pCtx, int nDelta);
+	static void	ModParamGetStr (void *pCtx, char *pBuf, unsigned nMax);
+
+	// ── BPM + clock source ────────────────────────────────────────────────────
+	float		m_fBPM;			// internal BPM (20–300)
+	unsigned	m_nClockSource;		// 0=Internal, 1=External MIDI
+	uint32_t	m_nExtClockLastUs;	// wall-clock time of last 0xF8 received
+	uint32_t	m_nExtClockDeltaUs;	// rolling-average inter-clock interval (µs)
+	bool		m_bExtClockValid;	// first pulse seen yet?
+	void		HandleMidiClock ();
+	static void	BPMAdjust     (void *pCtx, int nDelta);
+	static void	BPMGetStr     (void *pCtx, char *pBuf, unsigned nMax);
+	static void	ClockSrcAdjust (void *pCtx, int nDelta);
+	static void	ClockSrcGetStr (void *pCtx, char *pBuf, unsigned nMax);
 
 	// ── MIDI state ────────────────────────────────────────────────────────────
 	boolean			m_bSerialOK;		// TRS serial init result

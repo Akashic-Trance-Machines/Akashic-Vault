@@ -51,6 +51,11 @@ CKernel::CKernel ()
 	m_bUsbMidiFound (FALSE),
 	m_nDispMidi {0, 0, 0},
 	m_nMidiCount (0),
+	m_fBPM (120.0f),
+	m_nClockSource (0),
+	m_nExtClockLastUs (0),
+	m_nExtClockDeltaUs (0),
+	m_bExtClockValid (false),
 	m_nVolume (80),
 	m_nFXSlot {1, 0, 0},	// FX1=CloudSeed, FX2=None, FX3=None
 	m_bNavHeld (FALSE),
@@ -122,7 +127,7 @@ boolean CKernel::Initialize ()
 	m_Engine.Init (48000, MAX_BLOCK);
 	m_Plaits.Init (48000, MAX_BLOCK);
 	m_Engine.SetGeneratorDirect (0, &m_Plaits);
-	LOGNOTE ("Plaits loaded — 24 engines ready");
+	LOGNOTE ("Plaits loaded — 24 engines (VA VCF … Hi-Hat)");
 
 	// ── Audio FX init (FX slot 0 = CloudSeed by default) ─────────────────────
 	m_CloudSeed.Init (48000, MAX_BLOCK);
@@ -243,6 +248,177 @@ void CKernel::AdjustVolume (int nDelta)
 	if (v > 100) v = 100;
 	m_nVolume = (unsigned) v;
 	m_I2SAudio.SetVolume ((float) m_nVolume / 100.0f);
+}
+
+// ── BPM + clock source callbacks ─────────────────────────────────────────────
+
+void CKernel::BPMAdjust (void *pCtx, int nDelta)
+{
+	CKernel *pThis = static_cast<CKernel *> (pCtx);
+	float fNew = pThis->m_fBPM + (float) nDelta;
+	if (fNew < 20.0f)  fNew = 20.0f;
+	if (fNew > 300.0f) fNew = 300.0f;
+	pThis->m_fBPM = fNew;
+	if (pThis->m_nClockSource == 0)		// only push if in internal mode
+		pThis->m_Engine.SetTempo (pThis->m_fBPM);
+}
+
+void CKernel::BPMGetStr (void *pCtx, char *pBuf, unsigned nMax)
+{
+	CKernel *pThis = static_cast<CKernel *> (pCtx);
+	snprintf (pBuf, nMax, "%.0f", pThis->m_fBPM);
+}
+
+void CKernel::ClockSrcAdjust (void *pCtx, int /*nDelta*/)
+{
+	// Toggle between Internal (0) and External MIDI (1).
+	CKernel *pThis = static_cast<CKernel *> (pCtx);
+	pThis->m_nClockSource = (pThis->m_nClockSource == 0) ? 1 : 0;
+	if (pThis->m_nClockSource == 0)
+	{
+		pThis->m_Engine.SetClockSource (ClockSource::Internal);
+		pThis->m_Engine.SetTempo (pThis->m_fBPM);
+	}
+	else
+	{
+		pThis->m_bExtClockValid   = false;
+		pThis->m_nExtClockDeltaUs = 0;
+		// Keep current BPM estimate running until first clock arrives.
+	}
+}
+
+void CKernel::ClockSrcGetStr (void *pCtx, char *pBuf, unsigned nMax)
+{
+	CKernel *pThis = static_cast<CKernel *> (pCtx);
+	snprintf (pBuf, nMax, "%s", pThis->m_nClockSource == 0 ? "Internal" : "Ext MIDI");
+}
+
+// Derive BPM from 0xF8 inter-pulse timing (24 clocks per quarter note).
+void CKernel::HandleMidiClock ()
+{
+	uint32_t nNow = m_Timer.GetClockTicks ();
+	if (m_bExtClockValid)
+	{
+		uint32_t nDelta = nNow - m_nExtClockLastUs;
+		// Rolling 8-pulse average for stability.
+		if (m_nExtClockDeltaUs == 0)
+			m_nExtClockDeltaUs = nDelta;
+		else
+			m_nExtClockDeltaUs = (m_nExtClockDeltaUs * 7 + nDelta) / 8;
+
+		// 24 MIDI clocks per quarter note.
+		float fBPM = 60000000.0f / ((float) m_nExtClockDeltaUs * 24.0f);
+		if (fBPM >= 20.0f && fBPM <= 300.0f)
+		{
+			m_fBPM = fBPM;
+			m_Engine.SetTempo (fBPM);
+		}
+	}
+	m_nExtClockLastUs = nNow;
+	m_bExtClockValid  = true;
+}
+
+// ── Mod param callbacks ───────────────────────────────────────────────────────
+//
+// Sources 0-1 = LFO 0-1,  sources 2-3 = Env 0-1.
+// LFO params: 0=Rate(Hz) 1=Shape 2=Depth 3=Target
+// Env params: 0=Attack(ms) 1=Decay(ms) 2=Depth 3=Target
+
+void CKernel::ModParamAdjust (void *pCtx, int nDelta)
+{
+	auto *c = static_cast<TModParamCtx *> (pCtx);
+	CKernel *pK = c->pKernel;
+	unsigned s  = c->nSrc;
+	unsigned p  = c->nParam;
+
+	if (s < 2)
+	{
+		// LFO source
+		CLFO &lfo = pK->m_ModRouter.LFO (s);
+		switch (p)
+		{
+		case 0:	// Rate — step 0.1 Hz, range 0.01–20
+			lfo.SetRate (lfo.GetRate () + (float) nDelta * 0.1f);
+			break;
+		case 1:	// Shape — cycle through enum
+		{
+			int sh = (int) lfo.GetShape () + nDelta;
+			int n  = (int) CLFO::Shape::NUM_SHAPES;
+			sh = ((sh % n) + n) % n;
+			lfo.SetShape ((CLFO::Shape) sh);
+			break;
+		}
+		case 2:	// Depth — step 1%, range 0–100
+			lfo.SetDepth (lfo.GetDepth () + (float) nDelta * 0.01f);
+			break;
+		case 3:	// Target — cycle through ModTarget values
+		{
+			int t  = (int) pK->m_ModRouter.GetLFOTarget (s) + nDelta;
+			int n  = (int) ModTarget::NUM_TARGETS;
+			t = ((t % n) + n) % n;
+			pK->m_ModRouter.SetLFOTarget (s, (ModTarget) t);
+			break;
+		}
+		}
+	}
+	else
+	{
+		// Env source (index within env array = s - 2)
+		unsigned e = s - 2;
+		CCyclicEnv &env = pK->m_ModRouter.Env (e);
+		switch (p)
+		{
+		case 0:	// Attack — step 10ms
+			env.SetAttack (env.GetAttack () + (float) nDelta * 10.0f);
+			break;
+		case 1:	// Decay — step 10ms
+			env.SetDecay (env.GetDecay () + (float) nDelta * 10.0f);
+			break;
+		case 2:	// Depth — step 1%
+			env.SetDepth (env.GetDepth () + (float) nDelta * 0.01f);
+			break;
+		case 3:	// Target
+		{
+			int t  = (int) pK->m_ModRouter.GetEnvTarget (e) + nDelta;
+			int n  = (int) ModTarget::NUM_TARGETS;
+			t = ((t % n) + n) % n;
+			pK->m_ModRouter.SetEnvTarget (e, (ModTarget) t);
+			break;
+		}
+		}
+	}
+}
+
+void CKernel::ModParamGetStr (void *pCtx, char *pBuf, unsigned nMax)
+{
+	auto *c = static_cast<TModParamCtx *> (pCtx);
+	CKernel *pK = c->pKernel;
+	unsigned s  = c->nSrc;
+	unsigned p  = c->nParam;
+
+	if (s < 2)
+	{
+		CLFO &lfo = pK->m_ModRouter.LFO (s);
+		switch (p)
+		{
+		case 0: snprintf (pBuf, nMax, "%.2f Hz", lfo.GetRate ()); break;
+		case 1: snprintf (pBuf, nMax, "%s", CLFO::ShapeNames[(unsigned) lfo.GetShape ()]); break;
+		case 2: snprintf (pBuf, nMax, "%u%%", (unsigned)(lfo.GetDepth () * 100.0f + 0.5f)); break;
+		case 3: snprintf (pBuf, nMax, "%s", kModTargetNames[(unsigned) pK->m_ModRouter.GetLFOTarget (s)]); break;
+		}
+	}
+	else
+	{
+		unsigned e = s - 2;
+		CCyclicEnv &env = pK->m_ModRouter.Env (e);
+		switch (p)
+		{
+		case 0: snprintf (pBuf, nMax, "%.0f ms", env.GetAttack ()); break;
+		case 1: snprintf (pBuf, nMax, "%.0f ms", env.GetDecay ()); break;
+		case 2: snprintf (pBuf, nMax, "%u%%", (unsigned)(env.GetDepth () * 100.0f + 0.5f)); break;
+		case 3: snprintf (pBuf, nMax, "%s", kModTargetNames[(unsigned) pK->m_ModRouter.GetEnvTarget (e)]); break;
+		}
+	}
 }
 
 // ── FX slot selection ─────────────────────────────────────────────────────────
@@ -383,9 +559,43 @@ void CKernel::BuildMenus ()
 
 	// ── Settings page ─────────────────────────────────────────────────────
 	InitPage (&m_PageSettings, "Settings", &m_PageOSRoot);
+	MakeFreeRow  (&m_PageSettings, "BPM",       BPMAdjust,     BPMGetStr,     this);
+	MakeFreeRow  (&m_PageSettings, "Clock Src", ClockSrcAdjust, ClockSrcGetStr, this);
 	MakeReadOnlyRow (&m_PageSettings, "MIDI Ch",    "All");
 	MakeReadOnlyRow (&m_PageSettings, "Pitchbend",  "+/-2");
 	MakeReadOnlyRow (&m_PageSettings, "Version",    VERSION);
+
+	// ── Mod router pages ──────────────────────────────────────────────────
+	// LFO sub-pages (0=LFO1, 1=LFO2); Env sub-pages (0=Env1, 1=Env2).
+	// Each has 4 rows: Rate/Atk, Shape/Dec, Depth, Target.
+	static const char *const s_LFOParamLabels[] = { "Rate", "Shape", "Depth", "Target" };
+	static const char *const s_EnvParamLabels[] = { "Attack", "Decay", "Depth", "Target" };
+	static const char *const s_LFOPageNames[]   = { "LFO 1", "LFO 2" };
+	static const char *const s_EnvPageNames[]   = { "Env 1", "Env 2" };
+
+	InitPage (&m_PageModMain, "Mod", &m_PageOSRoot);
+	for (unsigned i = 0; i < 2; i++)
+	{
+		InitPage (&m_PageModLFO[i], s_LFOPageNames[i], &m_PageModMain);
+		for (unsigned p = 0; p < 4; p++)
+		{
+			m_ModParamCtx[i][p] = { this, i, p };
+			MakeFreeRow (&m_PageModLFO[i], s_LFOParamLabels[p],
+				     ModParamAdjust, ModParamGetStr, &m_ModParamCtx[i][p]);
+		}
+		MakeMenuRow (&m_PageModMain, s_LFOPageNames[i], &m_PageModLFO[i]);
+	}
+	for (unsigned i = 0; i < 2; i++)
+	{
+		InitPage (&m_PageModEnv[i], s_EnvPageNames[i], &m_PageModMain);
+		for (unsigned p = 0; p < 4; p++)
+		{
+			m_ModParamCtx[i + 2][p] = { this, i + 2, p };
+			MakeFreeRow (&m_PageModEnv[i], s_EnvParamLabels[p],
+				     ModParamAdjust, ModParamGetStr, &m_ModParamCtx[i + 2][p]);
+		}
+		MakeMenuRow (&m_PageModMain, s_EnvPageNames[i], &m_PageModEnv[i]);
+	}
 
 	// ── OS Root ───────────────────────────────────────────────────────────
 	InitPage (&m_PageOSRoot, "AV-OS", nullptr);
@@ -393,6 +603,7 @@ void CKernel::BuildMenus ()
 	MakeMenuRow  (&m_PageOSRoot, "Sound Generator", &m_PageSoundGen);
 	MakeMenuRow  (&m_PageOSRoot, "FX Chain",        &m_PageFXChain);
 	MakeMenuRow  (&m_PageOSRoot, "MIDI FX",         &m_PageMidiFX);
+	MakeMenuRow  (&m_PageOSRoot, "Mod",             &m_PageModMain);
 	MakeMenuRow  (&m_PageOSRoot, "Presets",         &m_PagePresets);
 	MakeMenuRow  (&m_PageOSRoot, "Settings",        &m_PageSettings);
 }
@@ -409,7 +620,11 @@ TShutdownMode CKernel::Run ()
 
 		PollMidi ();
 		PollInput ();
-		m_Engine.Tick (m_Timer.GetClockTicks ());	// drives clock-synced MIDI FX (arp)
+		{
+			uint32_t nNow = m_Timer.GetClockTicks ();
+			m_Engine.Tick (nNow);			// drives clock-synced MIDI FX (arp)
+			m_ModRouter.Update (nNow, &m_Plaits);	// LFO/env → Plaits live mod
+		}
 		m_UI.Draw ();
 
 		m_GUI.Update ();
@@ -576,11 +791,33 @@ static unsigned MidiMsgLen (u8 status)
 void CKernel::DispatchMidi (u8 status, u8 d1, u8 d2)
 {
 	TMidiEvent ev;
-	ev.Type       = static_cast<MidiType> (status & 0xF0);
-	ev.nChannel   = status & 0x0F;
 	ev.nData1     = d1;
 	ev.nData2     = d2;
 	ev.nTimeStamp = 0;
+
+	// System-realtime messages (0xF8-0xFF) carry no channel nibble — the status
+	// byte IS the full type.  Channel-voice / system-common use the upper nibble.
+	if (status >= 0xF8)
+	{
+		ev.Type     = static_cast<MidiType> (status);
+		ev.nChannel = 0;
+
+		// MIDI clock: used for external BPM sync when clock source = External.
+		if (status == 0xF8 && m_nClockSource == 1)
+			HandleMidiClock ();
+		// MIDI Start: reset the clock estimator so BPM derivation is fresh.
+		if (status == 0xFA)
+		{
+			m_bExtClockValid   = false;
+			m_nExtClockDeltaUs = 0;
+		}
+	}
+	else
+	{
+		ev.Type     = static_cast<MidiType> (status & 0xF0);
+		ev.nChannel = status & 0x0F;
+	}
+
 	m_Engine.PushMidi (ev);
 
 	m_nDispMidi[0] = status;

@@ -22,6 +22,7 @@ OBJS = \
 	main.o \
 	kernel.o \
 	engine/cengine.o \
+	engine/cmodrouter.o \
 	engine/cmoduleregistry.o \
 	engine/isoundgenerator.o \
 	platform/ci2saudio.o \
