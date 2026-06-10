@@ -89,11 +89,26 @@ boolean CKernel::Initialize ()
 		if (pTarget) m_Logger.Initialize (pTarget);
 		// Logger failure is non-fatal — we're running headless.
 	}
+	// ACT LED blink codes: each group fires when that stage succeeds so the
+	// user can count blinks to find exactly where the boot stalls.
+	// Constructor already blinked 5×. Pattern here: 1×, 2×, 3×, 4×, …
+	// Watch the LED and report the LAST blink count you see.
+
 	if (bOK) bOK = m_Interrupt.Initialize ();
 	if (bOK) bOK = m_Timer.Initialize ();
-	if (bOK) bOK = m_USBHCI.Initialize ();
+	if (bOK) m_ActLED.Blink (1);		// ── diag 1: Interrupt + Timer OK
+
+	// USB host (USB MIDI): optional — do NOT gate bOK.
+	// On Pi4 the xHCI/VL805 controller can return false at boot when no USB
+	// device is attached; gating here killed I2C, OLED and audio.
+	if (bOK) m_USBHCI.Initialize ();
+	if (bOK) m_ActLED.Blink (2);		// ── diag 2: past USBHCI
+
 	if (bOK) bOK = m_I2CMaster.Initialize ();
+	if (bOK) m_ActLED.Blink (3);		// ── diag 3: I2C master OK
+
 	if (bOK) bOK = m_EMMC.Initialize ();
+	if (bOK) m_ActLED.Blink (4);		// ── diag 4: EMMC OK
 
 	// ── TRS MIDI UART @31250 (interrupt-buffered; Read() in PollMidi) ─────────
 	m_bSerialOK = m_Serial.Initialize (31250);
@@ -108,6 +123,7 @@ boolean CKernel::Initialize ()
 	// ── OLED via CLVGL ────────────────────────────────────────────────────────
 	if (bOK) bOK = m_Display.Initialize ();
 	if (bOK) bOK = m_GUI.Initialize ();
+	if (bOK) m_ActLED.Blink (5);		// ── diag 5: OLED + LVGL OK
 
 	if (bOK)
 	{
