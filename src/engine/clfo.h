@@ -1,9 +1,10 @@
 //
 // clfo.h
 //
-// Akashic Vault — Simple LFO source for the mod router.
-// Runs at main-loop update rate (typically ~1 kHz); accumulates phase using
-// wall-clock microseconds from CTimer::GetClockTicks().
+// Akashic Vault — BPM-syncable LFO source for the mod router.
+// Runs at main-loop update rate (~1 kHz); accumulates phase using wall-clock
+// microseconds.  In sync mode the rate is derived from BPM + note division;
+// in free mode it runs at the stored Hz value.
 //
 // Copyright (C) 2026  The Akashic Trance Machines Team
 // This file is part of Akashic Vault and is licensed under GPL-3.0.
@@ -11,6 +12,7 @@
 //
 #pragma once
 
+#include "cmodsync.h"
 #include <cmath>
 #include <cstdint>
 
@@ -33,32 +35,45 @@ public:
 		m_fDepth (0.5f),
 		m_fPhase (0.0f),
 		m_Shape (Shape::Sine),
+		m_bSync (false),
+		m_nDivision (3),		// default: 1/4 note
 		m_nLastUs (0)
 	{
 	}
 
+	// Free-run rate (used when Sync = Off)
 	void  SetRate  (float fHz)
 	{
-		m_fRate  = fHz  < 0.01f ? 0.01f : (fHz  > 20.0f ? 20.0f : fHz);
+		m_fRate = fHz < 0.01f ? 0.01f : (fHz > 20.0f ? 20.0f : fHz);
 	}
+	float GetRate  () const { return m_fRate; }
+
 	void  SetDepth (float fD)
 	{
-		m_fDepth = fD   < 0.0f  ? 0.0f  : (fD   > 1.0f  ? 1.0f  : fD);
+		m_fDepth = fD < 0.0f ? 0.0f : (fD > 1.0f ? 1.0f : fD);
 	}
-	void  SetShape (Shape s)   { m_Shape = s; }
-	float GetRate  () const    { return m_fRate;  }
-	float GetDepth () const    { return m_fDepth; }
-	Shape GetShape () const    { return m_Shape;  }
+	float GetDepth () const { return m_fDepth; }
 
-	// Call once per main-loop tick.  Returns current output (-depth..+depth).
-	float Update (uint32_t nNowUs)
+	void  SetShape (Shape s) { m_Shape = s; }
+	Shape GetShape () const  { return m_Shape; }
+
+	// BPM sync
+	void     SetSync     (bool b)     { m_bSync = b; }
+	bool     GetSync     () const     { return m_bSync; }
+	void     SetDivision (unsigned n) { m_nDivision = n < kNumSyncDivisions ? n : 0; }
+	unsigned GetDivision () const     { return m_nDivision; }
+
+	// Advance one tick.  fBPM is used only when Sync = On.
+	// Returns current output in (-depth .. +depth).
+	float Update (uint32_t nNowUs, float fBPM)
 	{
+		float fRate = m_bSync ? SyncDivToHz (m_nDivision, fBPM) : m_fRate;
 		if (m_nLastUs != 0)
 		{
 			float fDeltaS = (float)(uint32_t)(nNowUs - m_nLastUs) * 1e-6f;
-			m_fPhase += m_fRate * fDeltaS;
+			m_fPhase += fRate * fDeltaS;
 			if (m_fPhase >= 1.0f)
-				m_fPhase -= (float)(int)m_fPhase;	// wrap, keep fractional
+				m_fPhase -= (float)(int)m_fPhase;
 		}
 		m_nLastUs = nNowUs;
 		return _value ();
@@ -97,5 +112,7 @@ private:
 	float		m_fDepth;
 	float		m_fPhase;
 	Shape		m_Shape;
+	bool		m_bSync;
+	unsigned	m_nDivision;
 	uint32_t	m_nLastUs;
 };

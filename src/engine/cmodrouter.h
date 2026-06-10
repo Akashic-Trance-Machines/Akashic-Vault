@@ -53,8 +53,9 @@ public:
 	void       SetEnvTarget (unsigned n, ModTarget t) { if (n < NUM_ENVS) m_EnvTarget[n] = t; }
 
 	// Advance all sources one tick and push mod values to Plaits.
-	// Call from the main loop with CTimer::GetClockTicks() (microseconds).
-	void Update (uint32_t nNowUs, CPlaitsGenerator *pPlaits);
+	// Call from the main loop with CTimer::GetClockTicks() (microseconds) and
+	// the current BPM (used by sources in sync mode).
+	void Update (uint32_t nNowUs, float fBPM, CPlaitsGenerator *pPlaits);
 
 private:
 	CLFO		m_LFO[NUM_LFOS];

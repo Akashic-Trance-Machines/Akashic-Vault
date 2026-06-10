@@ -176,10 +176,10 @@ private:
 
 	// ── Mod router UI contexts ────────────────────────────────────────────────
 	// sources: 0-1 = LFO 0-1,  2-3 = Env 0-1
-	// params:  LFO: 0=Rate 1=Shape 2=Depth 3=Target
-	//          Env: 0=Attack 1=Decay 2=Depth 3=Target
+	// params:  LFO: 0=Sync 1=Rate/Div 2=Shape 3=Depth 4=Target
+	//          Env: 0=Sync 1=Atk ms/Div 2=Dec ms/Div 3=Depth 4=Target
 	struct TModParamCtx { CKernel *pKernel; unsigned nSrc; unsigned nParam; };
-	TModParamCtx	m_ModParamCtx[4][4];
+	TModParamCtx	m_ModParamCtx[4][5];
 	static void	ModParamAdjust (void *pCtx, int nDelta);
 	static void	ModParamGetStr (void *pCtx, char *pBuf, unsigned nMax);
 

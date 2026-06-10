@@ -15,21 +15,21 @@ CModRouter::CModRouter ()
 	for (unsigned i = 0; i < NUM_ENVS; i++) m_EnvTarget[i] = ModTarget::None;
 }
 
-void CModRouter::Update (uint32_t nNowUs, CPlaitsGenerator *pPlaits)
+void CModRouter::Update (uint32_t nNowUs, float fBPM, CPlaitsGenerator *pPlaits)
 {
 	// Advance all sources and accumulate per-target values.
 	float fMod[kNumModTargets] = {};
 
 	for (unsigned i = 0; i < NUM_LFOS; i++)
 	{
-		float v = m_LFO[i].Update (nNowUs);
+		float v = m_LFO[i].Update (nNowUs, fBPM);
 		unsigned t = (unsigned) m_LFOTarget[i];
 		if (t > 0 && t < kNumModTargets)
 			fMod[t] += v;
 	}
 	for (unsigned i = 0; i < NUM_ENVS; i++)
 	{
-		float v = m_Env[i].Update (nNowUs);
+		float v = m_Env[i].Update (nNowUs, fBPM);
 		unsigned t = (unsigned) m_EnvTarget[i];
 		if (t > 0 && t < kNumModTargets)
 			fMod[t] += v;

@@ -333,14 +333,30 @@ void CKernel::ModParamAdjust (void *pCtx, int nDelta)
 
 	if (s < 2)
 	{
-		// LFO source
+		// ── LFO ──────────────────────────────────────────────────────────
+		// params: 0=Sync  1=Rate(Hz)/Division  2=Shape  3=Depth  4=Target
 		CLFO &lfo = pK->m_ModRouter.LFO (s);
 		switch (p)
 		{
-		case 0:	// Rate — step 0.1 Hz, range 0.01–20
-			lfo.SetRate (lfo.GetRate () + (float) nDelta * 0.1f);
+		case 0:	// Sync toggle
+			lfo.SetSync (!lfo.GetSync ());
 			break;
-		case 1:	// Shape — cycle through enum
+		case 1:
+			if (lfo.GetSync ())
+			{
+				// Division — step through sync table
+				int d = (int) lfo.GetDivision () + nDelta;
+				int n = (int) kNumSyncDivisions;
+				d = ((d % n) + n) % n;
+				lfo.SetDivision ((unsigned) d);
+			}
+			else
+			{
+				// Free Hz — step 0.1 Hz
+				lfo.SetRate (lfo.GetRate () + (float) nDelta * 0.1f);
+			}
+			break;
+		case 2:	// Shape
 		{
 			int sh = (int) lfo.GetShape () + nDelta;
 			int n  = (int) CLFO::Shape::NUM_SHAPES;
@@ -348,13 +364,13 @@ void CKernel::ModParamAdjust (void *pCtx, int nDelta)
 			lfo.SetShape ((CLFO::Shape) sh);
 			break;
 		}
-		case 2:	// Depth — step 1%, range 0–100
+		case 3:	// Depth — step 1%
 			lfo.SetDepth (lfo.GetDepth () + (float) nDelta * 0.01f);
 			break;
-		case 3:	// Target — cycle through ModTarget values
+		case 4:	// Target
 		{
-			int t  = (int) pK->m_ModRouter.GetLFOTarget (s) + nDelta;
-			int n  = (int) ModTarget::NUM_TARGETS;
+			int t = (int) pK->m_ModRouter.GetLFOTarget (s) + nDelta;
+			int n = (int) ModTarget::NUM_TARGETS;
 			t = ((t % n) + n) % n;
 			pK->m_ModRouter.SetLFOTarget (s, (ModTarget) t);
 			break;
@@ -363,24 +379,48 @@ void CKernel::ModParamAdjust (void *pCtx, int nDelta)
 	}
 	else
 	{
-		// Env source (index within env array = s - 2)
+		// ── Cyclic Envelope ───────────────────────────────────────────────
+		// params: 0=Sync  1=Atk(ms)/Div  2=Dec(ms)/Div  3=Depth  4=Target
 		unsigned e = s - 2;
 		CCyclicEnv &env = pK->m_ModRouter.Env (e);
 		switch (p)
 		{
-		case 0:	// Attack — step 10ms
-			env.SetAttack (env.GetAttack () + (float) nDelta * 10.0f);
+		case 0:	// Sync toggle
+			env.SetSync (!env.GetSync ());
 			break;
-		case 1:	// Decay — step 10ms
-			env.SetDecay (env.GetDecay () + (float) nDelta * 10.0f);
+		case 1:
+			if (env.GetSync ())
+			{
+				int d = (int) env.GetDivAtk () + nDelta;
+				int n = (int) kNumSyncDivisions;
+				d = ((d % n) + n) % n;
+				env.SetDivAtk ((unsigned) d);
+			}
+			else
+			{
+				env.SetAttack (env.GetAttack () + (float) nDelta * 10.0f);
+			}
 			break;
-		case 2:	// Depth — step 1%
+		case 2:
+			if (env.GetSync ())
+			{
+				int d = (int) env.GetDivDec () + nDelta;
+				int n = (int) kNumSyncDivisions;
+				d = ((d % n) + n) % n;
+				env.SetDivDec ((unsigned) d);
+			}
+			else
+			{
+				env.SetDecay (env.GetDecay () + (float) nDelta * 10.0f);
+			}
+			break;
+		case 3:	// Depth — step 1%
 			env.SetDepth (env.GetDepth () + (float) nDelta * 0.01f);
 			break;
-		case 3:	// Target
+		case 4:	// Target
 		{
-			int t  = (int) pK->m_ModRouter.GetEnvTarget (e) + nDelta;
-			int n  = (int) ModTarget::NUM_TARGETS;
+			int t = (int) pK->m_ModRouter.GetEnvTarget (e) + nDelta;
+			int n = (int) ModTarget::NUM_TARGETS;
 			t = ((t % n) + n) % n;
 			pK->m_ModRouter.SetEnvTarget (e, (ModTarget) t);
 			break;
@@ -401,10 +441,16 @@ void CKernel::ModParamGetStr (void *pCtx, char *pBuf, unsigned nMax)
 		CLFO &lfo = pK->m_ModRouter.LFO (s);
 		switch (p)
 		{
-		case 0: snprintf (pBuf, nMax, "%.2f Hz", lfo.GetRate ()); break;
-		case 1: snprintf (pBuf, nMax, "%s", CLFO::ShapeNames[(unsigned) lfo.GetShape ()]); break;
-		case 2: snprintf (pBuf, nMax, "%u%%", (unsigned)(lfo.GetDepth () * 100.0f + 0.5f)); break;
-		case 3: snprintf (pBuf, nMax, "%s", kModTargetNames[(unsigned) pK->m_ModRouter.GetLFOTarget (s)]); break;
+		case 0: snprintf (pBuf, nMax, "%s", lfo.GetSync () ? "On" : "Off"); break;
+		case 1:
+			if (lfo.GetSync ())
+				snprintf (pBuf, nMax, "%s", kSyncDivNames[lfo.GetDivision ()]);
+			else
+				snprintf (pBuf, nMax, "%.2f Hz", lfo.GetRate ());
+			break;
+		case 2: snprintf (pBuf, nMax, "%s", CLFO::ShapeNames[(unsigned) lfo.GetShape ()]); break;
+		case 3: snprintf (pBuf, nMax, "%u%%", (unsigned)(lfo.GetDepth () * 100.0f + 0.5f)); break;
+		case 4: snprintf (pBuf, nMax, "%s", kModTargetNames[(unsigned) pK->m_ModRouter.GetLFOTarget (s)]); break;
 		}
 	}
 	else
@@ -413,10 +459,21 @@ void CKernel::ModParamGetStr (void *pCtx, char *pBuf, unsigned nMax)
 		CCyclicEnv &env = pK->m_ModRouter.Env (e);
 		switch (p)
 		{
-		case 0: snprintf (pBuf, nMax, "%.0f ms", env.GetAttack ()); break;
-		case 1: snprintf (pBuf, nMax, "%.0f ms", env.GetDecay ()); break;
-		case 2: snprintf (pBuf, nMax, "%u%%", (unsigned)(env.GetDepth () * 100.0f + 0.5f)); break;
-		case 3: snprintf (pBuf, nMax, "%s", kModTargetNames[(unsigned) pK->m_ModRouter.GetEnvTarget (e)]); break;
+		case 0: snprintf (pBuf, nMax, "%s", env.GetSync () ? "On" : "Off"); break;
+		case 1:
+			if (env.GetSync ())
+				snprintf (pBuf, nMax, "%s", kSyncDivNames[env.GetDivAtk ()]);
+			else
+				snprintf (pBuf, nMax, "%.0f ms", env.GetAttack ());
+			break;
+		case 2:
+			if (env.GetSync ())
+				snprintf (pBuf, nMax, "%s", kSyncDivNames[env.GetDivDec ()]);
+			else
+				snprintf (pBuf, nMax, "%.0f ms", env.GetDecay ());
+			break;
+		case 3: snprintf (pBuf, nMax, "%u%%", (unsigned)(env.GetDepth () * 100.0f + 0.5f)); break;
+		case 4: snprintf (pBuf, nMax, "%s", kModTargetNames[(unsigned) pK->m_ModRouter.GetEnvTarget (e)]); break;
 		}
 	}
 }
@@ -568,8 +625,10 @@ void CKernel::BuildMenus ()
 	// ── Mod router pages ──────────────────────────────────────────────────
 	// LFO sub-pages (0=LFO1, 1=LFO2); Env sub-pages (0=Env1, 1=Env2).
 	// Each has 4 rows: Rate/Atk, Shape/Dec, Depth, Target.
-	static const char *const s_LFOParamLabels[] = { "Rate", "Shape", "Depth", "Target" };
-	static const char *const s_EnvParamLabels[] = { "Attack", "Decay", "Depth", "Target" };
+	// LFO pages: Sync / Rate (Hz or div) / Shape / Depth / Target  — 5 rows
+	// Env pages: Sync / Attack (ms or div) / Decay (ms or div) / Depth / Target — 5 rows
+	static const char *const s_LFOParamLabels[] = { "Sync", "Rate", "Shape", "Depth", "Target" };
+	static const char *const s_EnvParamLabels[] = { "Sync", "Attack", "Decay", "Depth", "Target" };
 	static const char *const s_LFOPageNames[]   = { "LFO 1", "LFO 2" };
 	static const char *const s_EnvPageNames[]   = { "Env 1", "Env 2" };
 
@@ -577,7 +636,7 @@ void CKernel::BuildMenus ()
 	for (unsigned i = 0; i < 2; i++)
 	{
 		InitPage (&m_PageModLFO[i], s_LFOPageNames[i], &m_PageModMain);
-		for (unsigned p = 0; p < 4; p++)
+		for (unsigned p = 0; p < 5; p++)
 		{
 			m_ModParamCtx[i][p] = { this, i, p };
 			MakeFreeRow (&m_PageModLFO[i], s_LFOParamLabels[p],
@@ -588,7 +647,7 @@ void CKernel::BuildMenus ()
 	for (unsigned i = 0; i < 2; i++)
 	{
 		InitPage (&m_PageModEnv[i], s_EnvPageNames[i], &m_PageModMain);
-		for (unsigned p = 0; p < 4; p++)
+		for (unsigned p = 0; p < 5; p++)
 		{
 			m_ModParamCtx[i + 2][p] = { this, i + 2, p };
 			MakeFreeRow (&m_PageModEnv[i], s_EnvParamLabels[p],
@@ -622,8 +681,8 @@ TShutdownMode CKernel::Run ()
 		PollInput ();
 		{
 			uint32_t nNow = m_Timer.GetClockTicks ();
-			m_Engine.Tick (nNow);			// drives clock-synced MIDI FX (arp)
-			m_ModRouter.Update (nNow, &m_Plaits);	// LFO/env → Plaits live mod
+			m_Engine.Tick (nNow);				// drives clock-synced MIDI FX (arp)
+			m_ModRouter.Update (nNow, m_fBPM, &m_Plaits);	// LFO/env → Plaits live mod
 		}
 		m_UI.Draw ();
 
