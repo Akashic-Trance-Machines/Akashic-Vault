@@ -211,6 +211,10 @@ private:
 	volatile unsigned m_nMidiQWrite;	// head — written only by USB callback
 	volatile unsigned m_nMidiQRead;		// tail — written only by PollMidi
 
+	// USB host: deferred init (USBHCI hangs at boot on Pi4 without USB
+	// devices attached — we try Initialize() once from the main loop instead).
+	boolean			m_bUsbHCIInitialized;
+
 	// USB MIDI device (found lazily in PollMidi).
 	boolean			m_bUsbMidiFound;
 

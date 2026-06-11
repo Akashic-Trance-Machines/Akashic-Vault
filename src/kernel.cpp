@@ -48,6 +48,7 @@ CKernel::CKernel ()
 	m_nMidiParseIdx (0),
 	m_nMidiQWrite (0),
 	m_nMidiQRead (0),
+	m_bUsbHCIInitialized (FALSE),
 	m_bUsbMidiFound (FALSE),
 	m_nDispMidi {0, 0, 0},
 	m_nMidiCount (0),
@@ -98,11 +99,11 @@ boolean CKernel::Initialize ()
 	if (bOK) bOK = m_Timer.Initialize ();
 	if (bOK) m_ActLED.Blink (1);		// ── diag 1: Interrupt + Timer OK
 
-	// USB host (USB MIDI): optional — do NOT gate bOK.
-	// On Pi4 the xHCI/VL805 controller can return false at boot when no USB
-	// device is attached; gating here killed I2C, OLED and audio.
-	if (bOK) m_USBHCI.Initialize ();
-	if (bOK) m_ActLED.Blink (2);		// ── diag 2: past USBHCI
+	// USB host (USB MIDI): deferred — do NOT call Initialize() here.
+	// On Pi4 the xHCI/VL805 controller hangs indefinitely at boot when no
+	// USB device is attached; we defer the call to the main loop where it
+	// can be attempted non-blockingly once peripherals are running.
+	if (bOK) m_ActLED.Blink (2);		// ── diag 2: past USBHCI (deferred)
 
 	if (bOK) bOK = m_I2CMaster.Initialize ();
 	if (bOK) m_ActLED.Blink (3);		// ── diag 3: I2C master OK
@@ -698,7 +699,13 @@ TShutdownMode CKernel::Run ()
 
 	for (;;)
 	{
-		m_USBHCI.UpdatePlugAndPlay ();
+		// USB host plug-and-play: only call after Initialize() succeeded.
+		// On Pi4 without a USB device, CXHCIDevice::Initialize() blocks
+		// indefinitely — we skip it entirely and rely on TRS MIDI instead.
+		// m_bUsbHCIInitialized is set true if Initialize() was called and
+		// returned; UpdatePlugAndPlay() is safe only in that case.
+		if (m_bUsbHCIInitialized)
+			m_USBHCI.UpdatePlugAndPlay ();
 
 		PollMidi ();
 		PollInput ();
