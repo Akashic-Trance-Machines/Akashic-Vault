@@ -91,28 +91,31 @@ boolean CKernel::Initialize ()
 		if (pTarget) m_Logger.Initialize (pTarget);
 		// Logger failure is non-fatal — we're running headless.
 	}
-	// ACT LED blink codes: each group fires when that stage succeeds so the
-	// user can count blinks to find exactly where the boot stalls.
-	// Constructor already blinked 5×. Pattern here: 1×, 2×, 3×, 4×, …
-	// Watch the LED and report the LAST blink count you see.
+	// ACT LED diagnostic blinks — 750 ms per blink so each group is easy to
+	// count without HDMI.  Report the LAST group you see before it stops.
+	// Constructor already did a fast burst.
+	#define DIAG_BLINK(n) do { for (unsigned _i=0;_i<(n);_i++) { \
+		m_ActLED.On(); CTimer::SimpleMsDelay(750); \
+		m_ActLED.Off(); CTimer::SimpleMsDelay(400); } \
+		CTimer::SimpleMsDelay(1200); } while(0)
 
 	// ── CRITICAL: Interrupt + Timer — only fatal failures ───────────────────────
 	if (bOK) bOK = m_Interrupt.Initialize ();
 	if (bOK) bOK = m_Timer.Initialize ();
-	if (bOK) m_ActLED.Blink (1);		// ── diag 1: Interrupt + Timer OK
+	if (bOK) DIAG_BLINK (1);		// ── diag 1: Interrupt + Timer OK
 
 	// ── USB host: skip entirely (hangs on Pi4 without USB device) ────────────
-	if (bOK) m_ActLED.Blink (2);		// ── diag 2: USBHCI skipped
+	if (bOK) DIAG_BLINK (2);		// ── diag 2: USBHCI skipped
 
 	// ── I2C master: non-fatal — OLED/MCP won't work but audio can still run ──
 	if (bOK && !m_I2CMaster.Initialize ())
 		LOGWARN ("I2C master init failed — OLED and encoders unavailable");
-	if (bOK) m_ActLED.Blink (3);		// ── diag 3: past I2C master
+	if (bOK) DIAG_BLINK (3);		// ── diag 3: past I2C master
 
 	// ── EMMC: non-fatal — presets/config unavailable but audio still runs ─────
 	if (bOK && !m_EMMC.Initialize ())
 		LOGWARN ("EMMC init failed — SD card unavailable");
-	if (bOK) m_ActLED.Blink (4);		// ── diag 4: past EMMC
+	if (bOK) DIAG_BLINK (4);		// ── diag 4: past EMMC
 
 	// ── TRS MIDI UART @31250 ─────────────────────────────────────────────────
 	m_bSerialOK = m_Serial.Initialize (31250);
@@ -129,7 +132,7 @@ boolean CKernel::Initialize ()
 	boolean bGUI_OK    = bDisplayOK && m_GUI.Initialize ();
 	m_bGUIReady        = bGUI_OK;
 	if (!bDisplayOK) LOGWARN ("OLED display init failed");
-	if (bDisplayOK) m_ActLED.Blink (5);	// ── diag 5: OLED + LVGL OK
+	if (bDisplayOK) DIAG_BLINK (5);	// ── diag 5: OLED + LVGL OK
 
 	if (bGUI_OK)
 	{
@@ -177,9 +180,35 @@ boolean CKernel::Initialize ()
 
 	// ── I2S audio: starts regardless of display/encoder state ─────────────────
 	m_I2SAudio.SetEngine (&m_Engine);
-	if (bOK && !m_I2SAudio.Start ())
-		LOGWARN ("I2S audio start failed");
-	if (bOK) m_I2SAudio.SetVolume ((float) m_nVolume / 100.0f);
+	if (bOK)
+	{
+		if (m_I2SAudio.Start ())
+		{
+			m_I2SAudio.SetVolume ((float) m_nVolume / 100.0f);
+
+			// Audio ping: play middle-C for 1.5 s so we can confirm I2S
+			// is producing output independently of MIDI input.
+			TMidiEvent noteOn;
+			noteOn.Type     = MidiType::NoteOn;
+			noteOn.nChannel = 0;
+			noteOn.nData1   = 60;	// middle C
+			noteOn.nData2   = 100;
+			m_Engine.PushMidi (noteOn);
+			CTimer::SimpleMsDelay (1500);
+			TMidiEvent noteOff;
+			noteOff.Type     = MidiType::NoteOff;
+			noteOff.nChannel = 0;
+			noteOff.nData1   = 60;
+			noteOff.nData2   = 0;
+			m_Engine.PushMidi (noteOff);
+
+			DIAG_BLINK (6);		// ── diag 6: I2S audio running
+		}
+		else
+		{
+			LOGWARN ("I2S audio start failed");
+		}
+	}
 
 	// ── 4-row UI: only if OLED + LVGL initialised ────────────────────────────
 	if (bGUI_OK)
