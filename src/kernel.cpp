@@ -49,6 +49,7 @@ CKernel::CKernel ()
 	m_nMidiQWrite (0),
 	m_nMidiQRead (0),
 	m_bUsbHCIInitialized (FALSE),
+	m_bGUIReady (FALSE),
 	m_bUsbMidiFound (FALSE),
 	m_nDispMidi {0, 0, 0},
 	m_nMidiCount (0),
@@ -95,52 +96,58 @@ boolean CKernel::Initialize ()
 	// Constructor already blinked 5×. Pattern here: 1×, 2×, 3×, 4×, …
 	// Watch the LED and report the LAST blink count you see.
 
+	// ── CRITICAL: Interrupt + Timer — only fatal failures ───────────────────────
 	if (bOK) bOK = m_Interrupt.Initialize ();
 	if (bOK) bOK = m_Timer.Initialize ();
 	if (bOK) m_ActLED.Blink (1);		// ── diag 1: Interrupt + Timer OK
 
-	// USB host (USB MIDI): deferred — do NOT call Initialize() here.
-	// On Pi4 the xHCI/VL805 controller hangs indefinitely at boot when no
-	// USB device is attached; we defer the call to the main loop where it
-	// can be attempted non-blockingly once peripherals are running.
-	if (bOK) m_ActLED.Blink (2);		// ── diag 2: past USBHCI (deferred)
+	// ── USB host: skip entirely (hangs on Pi4 without USB device) ────────────
+	if (bOK) m_ActLED.Blink (2);		// ── diag 2: USBHCI skipped
 
-	if (bOK) bOK = m_I2CMaster.Initialize ();
-	if (bOK) m_ActLED.Blink (3);		// ── diag 3: I2C master OK
+	// ── I2C master: non-fatal — OLED/MCP won't work but audio can still run ──
+	if (bOK && !m_I2CMaster.Initialize ())
+		LOGWARN ("I2C master init failed — OLED and encoders unavailable");
+	if (bOK) m_ActLED.Blink (3);		// ── diag 3: past I2C master
 
-	if (bOK) bOK = m_EMMC.Initialize ();
-	if (bOK) m_ActLED.Blink (4);		// ── diag 4: EMMC OK
+	// ── EMMC: non-fatal — presets/config unavailable but audio still runs ─────
+	if (bOK && !m_EMMC.Initialize ())
+		LOGWARN ("EMMC init failed — SD card unavailable");
+	if (bOK) m_ActLED.Blink (4);		// ── diag 4: past EMMC
 
-	// ── TRS MIDI UART @31250 (interrupt-buffered; Read() in PollMidi) ─────────
+	// ── TRS MIDI UART @31250 ─────────────────────────────────────────────────
 	m_bSerialOK = m_Serial.Initialize (31250);
 	if (!m_bSerialOK)
 		LOGWARN ("TRS MIDI UART init failed");
 
-	if (bOK && f_mount (&m_FileSystem, DRIVE, 1) != FR_OK)
+	if (f_mount (&m_FileSystem, DRIVE, 1) != FR_OK)
 		LOGWARN ("SD mount failed (presets/config unavailable)");
 
 	LOGNOTE ("Akashic Vault " VERSION " starting");
 
-	// ── OLED via CLVGL ────────────────────────────────────────────────────────
-	if (bOK) bOK = m_Display.Initialize ();
-	if (bOK) bOK = m_GUI.Initialize ();
-	if (bOK) m_ActLED.Blink (5);		// ── diag 5: OLED + LVGL OK
+	// ── OLED via CLVGL: non-fatal — audio continues even if display fails ─────
+	boolean bDisplayOK = m_Display.Initialize ();
+	boolean bGUI_OK    = bDisplayOK && m_GUI.Initialize ();
+	m_bGUIReady        = bGUI_OK;
+	if (!bDisplayOK) LOGWARN ("OLED display init failed");
+	if (bDisplayOK) m_ActLED.Blink (5);	// ── diag 5: OLED + LVGL OK
 
-	if (bOK)
+	if (bGUI_OK)
 	{
 		lv_obj_set_style_bg_color   (lv_screen_active (), lv_color_black (), LV_PART_MAIN);
 		lv_obj_set_style_bg_opa     (lv_screen_active (), LV_OPA_COVER,     LV_PART_MAIN);
 		lv_obj_set_style_text_color (lv_screen_active (), lv_color_white (), LV_PART_MAIN);
 	}
 
-	// ── MCP23017 (encoders + buttons) ─────────────────────────────────────────
+	// ── MCP23017 (encoders + buttons): non-fatal ──────────────────────────────
+	if (bOK)
 	{
 		CGPIOPin McpReset (MCP_RESET_GPIO, GPIOModeOutput);
 		McpReset.Write (HIGH); m_Timer.MsDelay (10);
 		McpReset.Write (LOW);  m_Timer.MsDelay (10);
 		McpReset.Write (HIGH); m_Timer.MsDelay (100);
 	}
-	if (bOK) bOK = m_MCP.Initialize ();
+	if (bOK && !m_MCP.Initialize ())
+		LOGWARN ("MCP23017 init failed — encoders/buttons unavailable");
 	if (bOK)
 	{
 		m_nPrevPortA = m_MCP.ReadPortA ();
@@ -153,34 +160,36 @@ boolean CKernel::Initialize ()
 	m_Engine.SetGeneratorDirect (0, &m_Plaits);
 	LOGNOTE ("Plaits loaded — 24 engines (VA VCF … Hi-Hat)");
 
-	// ── Audio FX init (FX slot 0 = CloudSeed by default) ─────────────────────
+	// ── Audio FX init ─────────────────────────────────────────────────────────
 	m_CloudSeed.Init (48000, MAX_BLOCK);
 	m_YKChorus.Init  (48000, MAX_BLOCK);
-	m_nFXSlot[0] = 1;	// CloudSeed
-	m_nFXSlot[1] = 0;	// None
-	m_nFXSlot[2] = 0;	// None
+	m_nFXSlot[0] = 1;
+	m_nFXSlot[1] = 0;
+	m_nFXSlot[2] = 0;
 	m_Engine.SetAudioFXDirect (0, &m_CloudSeed);
 	LOGNOTE ("FX ready: CloudSeed + YKChorus");
 
-	// ── MIDI FX init (slot 0 = Arpeggiator, off by default) ──────────────────
+	// ── MIDI FX init ──────────────────────────────────────────────────────────
 	m_Arp.Init (48000, MAX_BLOCK);
 	m_Engine.SetMidiFXDirect (0, &m_Arp);
 	m_Engine.SetTempo (120.0f);
 	LOGNOTE ("MIDI FX ready: Arpeggiator");
 
-	// ── I2S audio ─────────────────────────────────────────────────────────────
+	// ── I2S audio: starts regardless of display/encoder state ─────────────────
 	m_I2SAudio.SetEngine (&m_Engine);
 	if (bOK && !m_I2SAudio.Start ())
 		LOGWARN ("I2S audio start failed");
+	if (bOK) m_I2SAudio.SetVolume ((float) m_nVolume / 100.0f);
 
-	// ── 4-row UI ──────────────────────────────────────────────────────────────
-	if (bOK)
+	// ── 4-row UI: only if OLED + LVGL initialised ────────────────────────────
+	if (bGUI_OK)
 	{
 		BuildMenus ();
-		m_I2SAudio.SetVolume ((float) m_nVolume / 100.0f);
 		m_UI.Init (&m_PageOSRoot);
 	}
 
+	// Always return true so the kernel does not halt: audio + TRS MIDI run
+	// even when OLED or encoders are unavailable.
 	return bOK;
 }
 
@@ -714,9 +723,11 @@ TShutdownMode CKernel::Run ()
 			m_Engine.Tick (nNow);				// drives clock-synced MIDI FX (arp)
 			m_ModRouter.Update (nNow, m_fBPM, &m_Plaits);	// LFO/env → Plaits live mod
 		}
-		m_UI.Draw ();
-
-		m_GUI.Update ();
+		if (m_bGUIReady)
+		{
+			m_UI.Draw ();
+			m_GUI.Update ();
+		}
 		m_Scheduler.Yield ();
 	}
 

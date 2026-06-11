@@ -215,6 +215,9 @@ private:
 	// devices attached — we try Initialize() once from the main loop instead).
 	boolean			m_bUsbHCIInitialized;
 
+	// Set true when OLED + LVGL initialised successfully; guards GUI calls.
+	boolean			m_bGUIReady;
+
 	// USB MIDI device (found lazily in PollMidi).
 	boolean			m_bUsbMidiFound;
 
