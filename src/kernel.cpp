@@ -77,20 +77,13 @@ boolean CKernel::Initialize ()
 {
 	boolean bOK = TRUE;
 
-	// HDMI screen is debug/log output only — headless operation (no monitor
-	// attached) is normal.  Do NOT gate bOK on it: CScreenDevice::Initialize()
-	// returns false when no display is detected on Pi4, which would silently
-	// poison bOK and kill the entire boot (I2C, I2S, OLED, everything).
-	boolean bScreenOK = m_Screen.Initialize ();
-	if (bOK)
-	{
-		// Log to the configured device; fall back to HDMI if available;
-		// if no target at all, the logger discards output but boot continues.
-		CDevice *pTarget = m_DeviceNameService.GetDevice (m_Options.GetLogDevice (), FALSE);
-		if (!pTarget && bScreenOK) pTarget = &m_Screen;
-		if (pTarget) m_Logger.Initialize (pTarget);
-		// Logger failure is non-fatal — we're running headless.
-	}
+	// HDMI screen: intentionally skipped.
+	// CScreenDevice::Initialize() crashes with a CPU exception on Pi4 (mailbox
+	// framebuffer setup fails before any LOGNOTE can fire, killing the kernel).
+	// The OLED is the real display; HDMI was debug-only.  Log output is
+	// discarded for now — ACT LED blinks are the diagnostic channel.
+	//
+	// boolean bScreenOK = m_Screen.Initialize ();  // DO NOT CALL — crashes Pi4
 	// ACT LED diagnostic blinks — 750 ms per blink so each group is easy to
 	// count without HDMI.  Report the LAST group you see before it stops.
 	// Constructor already did a fast burst.
