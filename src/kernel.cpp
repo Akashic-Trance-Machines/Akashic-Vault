@@ -98,46 +98,48 @@ boolean CKernel::Initialize ()
 		m_ActLED.On(); CTimer::SimpleMsDelay(750); \
 		m_ActLED.Off(); CTimer::SimpleMsDelay(400); } \
 		CTimer::SimpleMsDelay(1200); } while(0)
+	// DIAG_NOTE: log a message and pause 2 s so it's readable on HDMI.
+	#define DIAG_NOTE(msg) do { LOGNOTE(msg); CTimer::SimpleMsDelay(2000); } while(0)
 
 	// ── CRITICAL: Interrupt + Timer — only fatal failures ───────────────────────
-	LOGNOTE (">> Interrupt init");
+	DIAG_NOTE (">> Interrupt init");
 	if (bOK) bOK = m_Interrupt.Initialize ();
-	LOGNOTE (">> Timer init");
+	DIAG_NOTE (">> Timer init");
 	if (bOK) bOK = m_Timer.Initialize ();
 	if (bOK) DIAG_BLINK (1);
 
 	// ── USB host: skip entirely (hangs on Pi4 without USB device) ────────────
-	LOGNOTE (">> USBHCI skipped");
+	DIAG_NOTE (">> USBHCI skipped");
 	if (bOK) DIAG_BLINK (2);
 
 	// ── I2C master ────────────────────────────────────────────────────────────
-	LOGNOTE (">> I2C master init");
+	DIAG_NOTE (">> I2C master init");
 	if (bOK && !m_I2CMaster.Initialize ())
 		LOGWARN ("I2C master init failed");
 	if (bOK) DIAG_BLINK (3);
 
 	// ── EMMC ──────────────────────────────────────────────────────────────────
-	LOGNOTE (">> EMMC init");
+	DIAG_NOTE (">> EMMC init");
 	if (bOK && !m_EMMC.Initialize ())
 		LOGWARN ("EMMC init failed");
 	if (bOK) DIAG_BLINK (4);
 
 	// ── TRS MIDI UART @31250 ─────────────────────────────────────────────────
-	LOGNOTE (">> Serial init");
+	DIAG_NOTE (">> Serial init");
 	m_bSerialOK = m_Serial.Initialize (31250);
 	if (!m_bSerialOK)
 		LOGWARN ("TRS MIDI UART init failed");
 
-	LOGNOTE (">> SD mount");
+	DIAG_NOTE (">> SD mount");
 	if (f_mount (&m_FileSystem, DRIVE, 1) != FR_OK)
 		LOGWARN ("SD mount failed (presets/config unavailable)");
 
 	LOGNOTE ("Akashic Vault " VERSION " starting");
 
 	// ── OLED via CLVGL: non-fatal ─────────────────────────────────────────────
-	LOGNOTE (">> OLED Display init");
+	DIAG_NOTE (">> OLED Display init");
 	boolean bDisplayOK = m_Display.Initialize ();
-	LOGNOTE (">> LVGL init");
+	DIAG_NOTE (">> LVGL init");
 	boolean bGUI_OK    = bDisplayOK && m_GUI.Initialize ();
 	m_bGUIReady        = bGUI_OK;
 	if (!bDisplayOK) LOGWARN ("OLED display init failed");
@@ -167,17 +169,17 @@ boolean CKernel::Initialize ()
 	}
 
 	// ── Engine + Plaits generator ─────────────────────────────────────────────
-	LOGNOTE (">> Engine init");
+	DIAG_NOTE (">> Engine init");
 	m_Engine.Init (48000, MAX_BLOCK);
-	LOGNOTE (">> Plaits init");
+	DIAG_NOTE (">> Plaits init");
 	m_Plaits.Init (48000, MAX_BLOCK);
 	m_Engine.SetGeneratorDirect (0, &m_Plaits);
 	LOGNOTE ("Plaits loaded");
 
 	// ── Audio FX init ─────────────────────────────────────────────────────────
-	LOGNOTE (">> CloudSeed init");
+	DIAG_NOTE (">> CloudSeed init");
 	m_CloudSeed.Init (48000, MAX_BLOCK);
-	LOGNOTE (">> YKChorus init");
+	DIAG_NOTE (">> YKChorus init");
 	m_YKChorus.Init  (48000, MAX_BLOCK);
 	m_nFXSlot[0] = 1;
 	m_nFXSlot[1] = 0;
@@ -186,14 +188,14 @@ boolean CKernel::Initialize ()
 	LOGNOTE ("FX ready");
 
 	// ── MIDI FX init ──────────────────────────────────────────────────────────
-	LOGNOTE (">> Arp init");
+	DIAG_NOTE (">> Arp init");
 	m_Arp.Init (48000, MAX_BLOCK);
 	m_Engine.SetMidiFXDirect (0, &m_Arp);
 	m_Engine.SetTempo (120.0f);
 	LOGNOTE ("MIDI FX ready");
 
 	// ── I2S audio: starts regardless of display/encoder state ─────────────────
-	LOGNOTE (">> I2S audio start");
+	DIAG_NOTE (">> I2S audio start");
 	m_I2SAudio.SetEngine (&m_Engine);
 	if (bOK)
 	{
@@ -228,12 +230,13 @@ boolean CKernel::Initialize ()
 	// ── 4-row UI: only if OLED + LVGL initialised ────────────────────────────
 	if (bGUI_OK)
 	{
-		LOGNOTE (">> BuildMenus");
+		DIAG_NOTE (">> BuildMenus");
 		BuildMenus ();
 		m_UI.Init (&m_PageOSRoot);
 	}
 
-	LOGNOTE (">> Initialize complete (bOK=%d bGUI=%d)", bOK ? 1 : 0, bGUI_OK ? 1 : 0);
+	LOGNOTE (">> Initialize complete bOK=%d bGUI=%d", bOK ? 1 : 0, bGUI_OK ? 1 : 0);
+	CTimer::SimpleMsDelay (2000);
 
 	// If anything fatal failed, freeze the HDMI screen so the log stays visible.
 	if (!bOK)
