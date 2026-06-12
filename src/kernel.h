@@ -174,12 +174,13 @@ private:
 	TMenuRow	m_MenuRows[MAX_MENU_ROWS];
 	unsigned	m_nMenuRowCount;
 
-	// ── Mod router UI contexts ────────────────────────────────────────────────
+	// ── Mod source UI contexts ────────────────────────────────────────────────
 	// sources: 0-1 = LFO 0-1,  2-3 = Env 0-1
-	// params:  LFO: 0=Sync 1=Rate/Div 2=Shape 3=Depth 4=Target
-	//          Env: 0=Sync 1=Atk ms/Div 2=Dec ms/Div 3=Depth 4=Target
+	// params:  LFO: 0=Sync 1=Rate/Div 2=Shape 3=Depth
+	//          Env: 0=Sync 1=Atk ms/Div 2=Dec ms/Div 3=Depth
+	// (Routing lives in the SG's own params — see Sound Generator → Mod.)
 	struct TModParamCtx { CKernel *pKernel; unsigned nSrc; unsigned nParam; };
-	TModParamCtx	m_ModParamCtx[4][5];
+	TModParamCtx	m_ModParamCtx[4][4];
 	static void	ModParamAdjust (void *pCtx, int nDelta);
 	static void	ModParamGetStr (void *pCtx, char *pBuf, unsigned nMax);
 

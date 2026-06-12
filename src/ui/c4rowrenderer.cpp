@@ -235,8 +235,9 @@ void C4RowRenderer::FormatRow (const TMenuRow *pRow, char *pBuf, unsigned nMax) 
 		switch (desc.Display)
 		{
 		case ParamDisplay::Percent:
+			// Round away from zero so bipolar values display symmetrically.
 			snprintf (valBuf, sizeof (valBuf), "%d%%",
-				(int) (val.f * 100.0f + 0.5f));
+				(int) (val.f * 100.0f + (val.f >= 0.0f ? 0.5f : -0.5f)));
 			break;
 		case ParamDisplay::Decibels:
 			snprintf (valBuf, sizeof (valBuf), "%.1f dB", (double) val.f);

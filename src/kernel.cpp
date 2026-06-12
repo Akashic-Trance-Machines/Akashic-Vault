@@ -417,14 +417,6 @@ void CKernel::ModParamAdjust (void *pCtx, int nDelta)
 		case 3:	// Depth — step 1%
 			lfo.SetDepth (lfo.GetDepth () + (float) nDelta * 0.01f);
 			break;
-		case 4:	// Target
-		{
-			int t = (int) pK->m_ModRouter.GetLFOTarget (s) + nDelta;
-			int n = (int) ModTarget::NUM_TARGETS;
-			t = ((t % n) + n) % n;
-			pK->m_ModRouter.SetLFOTarget (s, (ModTarget) t);
-			break;
-		}
 		}
 	}
 	else
@@ -467,14 +459,6 @@ void CKernel::ModParamAdjust (void *pCtx, int nDelta)
 		case 3:	// Depth — step 1%
 			env.SetDepth (env.GetDepth () + (float) nDelta * 0.01f);
 			break;
-		case 4:	// Target
-		{
-			int t = (int) pK->m_ModRouter.GetEnvTarget (e) + nDelta;
-			int n = (int) ModTarget::NUM_TARGETS;
-			t = ((t % n) + n) % n;
-			pK->m_ModRouter.SetEnvTarget (e, (ModTarget) t);
-			break;
-		}
 		}
 	}
 }
@@ -500,7 +484,6 @@ void CKernel::ModParamGetStr (void *pCtx, char *pBuf, unsigned nMax)
 			break;
 		case 2: snprintf (pBuf, nMax, "%s", CLFO::ShapeNames[(unsigned) lfo.GetShape ()]); break;
 		case 3: snprintf (pBuf, nMax, "%u%%", (unsigned)(lfo.GetDepth () * 100.0f + 0.5f)); break;
-		case 4: snprintf (pBuf, nMax, "%s", kModTargetNames[(unsigned) pK->m_ModRouter.GetLFOTarget (s)]); break;
 		}
 	}
 	else
@@ -523,7 +506,6 @@ void CKernel::ModParamGetStr (void *pCtx, char *pBuf, unsigned nMax)
 				snprintf (pBuf, nMax, "%.0f ms", env.GetDecay ());
 			break;
 		case 3: snprintf (pBuf, nMax, "%u%%", (unsigned)(env.GetDepth () * 100.0f + 0.5f)); break;
-		case 4: snprintf (pBuf, nMax, "%s", kModTargetNames[(unsigned) pK->m_ModRouter.GetEnvTarget (e)]); break;
 		}
 	}
 }
@@ -599,16 +581,22 @@ void CKernel::BuildMenus ()
 	MakeParamRow (&m_PageTone, &m_Plaits, 4);	// decay
 	MakeParamRow (&m_PageTone, &m_Plaits, 5);	// lpg_colour
 
-	// ── Mod sub-page ──────────────────────────────────────────────────────
+	// ── Mod sub-page: Plaits' own mod amounts + pull-routes from the global
+	// LFO/Env sources (mod_src_*/mod_amt_* are SG params — they live and die
+	// with the generator and serialize into its presets).
 	InitPage (&m_PageMod, "Mod", &m_PageSoundGen);
 	MakeParamRow (&m_PageMod, &m_Plaits, 6);	// fm_amt
 	MakeParamRow (&m_PageMod, &m_Plaits, 7);	// timbre_mod
 	MakeParamRow (&m_PageMod, &m_Plaits, 8);	// morph_mod
+	for (unsigned i = 11; i <= 20; i++)		// 5 × (Source, Amount)
+		MakeParamRow (&m_PageMod, &m_Plaits, i);
 
 	// ── Sound Generator page ──────────────────────────────────────────────
 	InitPage (&m_PageSoundGen, "Sound Generator", &m_PageOSRoot);
 	MakeReadOnlyRow (&m_PageSoundGen, "SG",         "Plaits");	// selector (v1 read-only)
 	MakeParamRow    (&m_PageSoundGen, &m_Plaits, 0);		// engine
+	MakeParamRow    (&m_PageSoundGen, &m_Plaits, 9);		// voices (Mono..8)
+	MakeParamRow    (&m_PageSoundGen, &m_Plaits, 10);		// mono trig (Legato/Retrig)
 	MakeParamRow    (&m_PageSoundGen, &m_Plaits, 2);		// timbre
 	MakeParamRow    (&m_PageSoundGen, &m_Plaits, 3);		// morph
 	MakeParamRow    (&m_PageSoundGen, &m_Plaits, 1);		// harmonics
@@ -672,13 +660,13 @@ void CKernel::BuildMenus ()
 	MakeReadOnlyRow (&m_PageSettings, "Pitchbend",  "+/-2");
 	MakeReadOnlyRow (&m_PageSettings, "Version",    VERSION);
 
-	// ── Mod router pages ──────────────────────────────────────────────────
-	// LFO sub-pages (0=LFO1, 1=LFO2); Env sub-pages (0=Env1, 1=Env2).
-	// Each has 4 rows: Rate/Atk, Shape/Dec, Depth, Target.
-	// LFO pages: Sync / Rate (Hz or div) / Shape / Depth / Target  — 5 rows
-	// Env pages: Sync / Attack (ms or div) / Decay (ms or div) / Depth / Target — 5 rows
-	static const char *const s_LFOParamLabels[] = { "Sync", "Rate", "Shape", "Depth", "Target" };
-	static const char *const s_EnvParamLabels[] = { "Sync", "Attack", "Decay", "Depth", "Target" };
+	// ── Mod source pages ──────────────────────────────────────────────────
+	// Sources only — LFO 1/2 and Env 1/2 settings. Routing (which SG param
+	// pulls which source, and how much) lives in Sound Generator → Mod.
+	// LFO pages: Sync / Rate (Hz or div) / Shape / Depth — 4 rows
+	// Env pages: Sync / Attack (ms or div) / Decay (ms or div) / Depth — 4 rows
+	static const char *const s_LFOParamLabels[] = { "Sync", "Rate", "Shape", "Depth" };
+	static const char *const s_EnvParamLabels[] = { "Sync", "Attack", "Decay", "Depth" };
 	static const char *const s_LFOPageNames[]   = { "LFO 1", "LFO 2" };
 	static const char *const s_EnvPageNames[]   = { "Env 1", "Env 2" };
 
@@ -686,7 +674,7 @@ void CKernel::BuildMenus ()
 	for (unsigned i = 0; i < 2; i++)
 	{
 		InitPage (&m_PageModLFO[i], s_LFOPageNames[i], &m_PageModMain);
-		for (unsigned p = 0; p < 5; p++)
+		for (unsigned p = 0; p < 4; p++)
 		{
 			m_ModParamCtx[i][p] = { this, i, p };
 			MakeFreeRow (&m_PageModLFO[i], s_LFOParamLabels[p],
@@ -697,7 +685,7 @@ void CKernel::BuildMenus ()
 	for (unsigned i = 0; i < 2; i++)
 	{
 		InitPage (&m_PageModEnv[i], s_EnvPageNames[i], &m_PageModMain);
-		for (unsigned p = 0; p < 5; p++)
+		for (unsigned p = 0; p < 4; p++)
 		{
 			m_ModParamCtx[i + 2][p] = { this, i + 2, p };
 			MakeFreeRow (&m_PageModEnv[i], s_EnvParamLabels[p],
