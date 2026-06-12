@@ -77,13 +77,18 @@ boolean CKernel::Initialize ()
 {
 	boolean bOK = TRUE;
 
-	// HDMI screen: intentionally skipped.
-	// CScreenDevice::Initialize() crashes with a CPU exception on Pi4 (mailbox
-	// framebuffer setup fails before any LOGNOTE can fire, killing the kernel).
-	// The OLED is the real display; HDMI was debug-only.  Log output is
-	// discarded for now — ACT LED blinks are the diagnostic channel.
-	//
-	// boolean bScreenOK = m_Screen.Initialize ();  // DO NOT CALL — crashes Pi4
+	// HDMI screen: debug/log output. Non-fatal — headless operation is normal.
+	// (The earlier Pi4 "crash" attributed to this call was actually the
+	// firmware never starting the kernel at all: missing bcm2711-rpi-4-b.dtb,
+	// missing armstub8-rpi4.bin, and an outdated firmware pin. See
+	// scripts/deploy-sdcard.sh and config/config.txt.)
+	boolean bScreenOK = m_Screen.Initialize ();
+	if (bScreenOK)
+	{
+		CDevice *pTarget = m_DeviceNameService.GetDevice (m_Options.GetLogDevice (), FALSE);
+		if (!pTarget) pTarget = &m_Screen;
+		m_Logger.Initialize (pTarget);
+	}
 	// ACT LED diagnostic blinks — 750 ms per blink so each group is easy to
 	// count without HDMI.  Report the LAST group you see before it stops.
 	// Constructor already did a fast burst.
