@@ -263,6 +263,7 @@ Do **not** hand-roll an LVGL display/flush port — Circle already does it corre
 | Reverb/filter CPU spikes | Denormals | Enable flush-to-zero |
 | Link error invisible | Wrapper script hides it | Read `make` tail for `undefined reference` |
 | Your new module code never runs | `--gc-sections` stripped it | Ensure it's reachable from `main()` |
+| Pi4 hangs at rainbow splash; kernel never runs (code changes have no effect) | Boot chain incomplete: missing `bcm2711-rpi-4-b.dtb`, missing `armstub8-rpi4.bin`, or firmware commit not matching `circle/boot/Makefile` | Deploy script ships all three; keep `CIRCLE_FW_COMMIT` in `scripts/deploy-sdcard.sh` synced with `circle/boot/Makefile` when updating Circle. `config.txt` `[pi4]` must mirror Circle's `boot/config64.txt` (`armstub=`, `kernel=`, `max_framebuffers=2`) |
 
 ---
 
