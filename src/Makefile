@@ -77,6 +77,28 @@ OBJS += \
 	$(PLAITS_CORE)/stmlib/dsp/units.o \
 	$(PLAITS_CORE)/stmlib/utils/random.o
 
+# ── AV-Dexed (Synth_Dexed 6-op FM / DX7 engine, GPL-3.0 / Apache-2.0 core) ───
+DEXED_DIR  = modules/generators/dexed
+DEXED_CORE = $(DEXED_DIR)/core/synth_dexed
+OBJS += \
+	$(DEXED_DIR)/src/dexed_generator.o \
+	$(DEXED_CORE)/dexed.o \
+	$(DEXED_CORE)/dx7note.o \
+	$(DEXED_CORE)/env.o \
+	$(DEXED_CORE)/exp2.o \
+	$(DEXED_CORE)/fm_core.o \
+	$(DEXED_CORE)/fm_op_kernel.o \
+	$(DEXED_CORE)/freqlut.o \
+	$(DEXED_CORE)/lfo.o \
+	$(DEXED_CORE)/pitchenv.o \
+	$(DEXED_CORE)/porta.o \
+	$(DEXED_CORE)/sin.o \
+	$(DEXED_CORE)/synth_dexed.o \
+	$(DEXED_CORE)/EngineMkI.o \
+	$(DEXED_CORE)/EngineMsfa.o \
+	$(DEXED_CORE)/EngineOpl.o \
+	$(DEXED_CORE)/PluginFx.o
+
 # ── AV-CloudSeed (GhostNote algorithmic reverb, MIT core) ────────────────────
 CLOUDSEED_DIR  = modules/audiofx/cloudseed
 CLOUDSEED_CORE = $(CLOUDSEED_DIR)/core/CloudSeedCore
@@ -123,6 +145,9 @@ INCLUDE += -I $(NEWLIBDIR)/include -I $(CIRCLE_STDLIB_DIR)/include
 # Plaits/stmlib: include the vendored core root so `#include "plaits/..."` and
 # `#include "stmlib/..."` resolve correctly.
 INCLUDE += -I $(PLAITS_CORE) -I $(PLAITS_DIR)/src
+# Dexed: vendored engine headers + src wrapper. <arm_math.h> resolves to the
+# shared CloudSeed compat stub already on the include path below.
+INCLUDE += -I $(DEXED_CORE) -I $(DEXED_DIR)/src
 # CloudSeed: core root + compat/ for <arm_math.h> stub on AArch64.
 # Force-include cstdlib so std::rand in the core compiles without patching it.
 INCLUDE += -I $(CLOUDSEED_CORE)/.. -I $(CLOUDSEED_DIR)/src -I $(CLOUDSEED_DIR)/core/compat

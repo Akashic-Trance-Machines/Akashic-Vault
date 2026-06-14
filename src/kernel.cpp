@@ -70,7 +70,9 @@ CKernel::CKernel ()
 	// Register sound generators (index 0 = active at boot). Pages are bound
 	// later in BuildMenus once the menu tree exists.
 	m_pSG[0]     = &m_Plaits;
+	m_pSG[1]     = &m_Dexed;
 	m_pSGPage[0] = nullptr;
+	m_pSGPage[1] = nullptr;
 	m_ActLED.Blink (5);
 }
 
@@ -641,6 +643,21 @@ void CKernel::BuildMenus ()
 	MakeParamRow    (&m_PageSoundGen, &m_Plaits, 1);		// harmonics
 	MakeMenuRow     (&m_PageSoundGen, "Tone",    &m_PageTone);
 	MakeMenuRow     (&m_PageSoundGen, "Mod",     &m_PageMod);
+
+	// ── Dexed Operators sub-page (per-op Level + On/Off) ──────────────────
+	InitPage (&m_PageDexedOps, "Operators", &m_PageDexed);
+	for (unsigned i = 4; i <= 15; i++)		// params 4..15 = op1..op6 (level,on)
+		MakeParamRow (&m_PageDexedOps, &m_Dexed, i);
+
+	// ── Sound Generator page (Dexed) — bound as m_pSGPage[1] ──────────────
+	InitPage (&m_PageDexed, "Sound Generator", &m_PageOSRoot);
+	m_pSGPage[1] = &m_PageDexed;
+	MakeFreeRow  (&m_PageDexed, "SG", SGSelectAdjust, SGSelectGetStr, this);
+	MakeParamRow (&m_PageDexed, &m_Dexed, 0);		// algorithm
+	MakeParamRow (&m_PageDexed, &m_Dexed, 1);		// feedback
+	MakeParamRow (&m_PageDexed, &m_Dexed, 2);		// transpose
+	MakeParamRow (&m_PageDexed, &m_Dexed, 3);		// voices (Mono..16)
+	MakeMenuRow  (&m_PageDexed, "Operators", &m_PageDexedOps);
 
 	// ── CloudSeed param page (all params, scrollable) ────────────────────
 	InitPage (&m_PageCloudSeed, "CloudSeed", &m_PageFXChain);

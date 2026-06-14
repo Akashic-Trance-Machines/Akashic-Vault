@@ -37,6 +37,7 @@
 #include "platform/ci2saudio.h"
 #include "ui/c4rowui.h"
 #include "modules/generators/plaits/src/plaits_generator.h"
+#include "modules/generators/dexed/src/dexed_generator.h"
 #include "modules/audiofx/cloudseed/src/cloudseed_fx.h"
 #include "modules/audiofx/ykchorus/src/ykchorus_fx.h"
 #include "modules/midifx/arp/src/arp_midifx.h"
@@ -102,13 +103,14 @@ private:
 
 	// ── Generators ────────────────────────────────────────────────────────
 	CPlaitsGenerator	m_Plaits;
+	CDexedGenerator		m_Dexed;
 
 	// SG registry — the active generator is m_pSG[m_nActiveSG], wired into
 	// engine slot 0 and fed by the mod router. Pages are hand-built per SG;
 	// the "SG" selector row cycles the active one, rewires the engine, and
 	// jumps to that SG's page. Bump NUM_SG and register the new instance +
-	// page to add a generator (e.g. Dexed).
-	static constexpr unsigned NUM_SG = 1;
+	// page to add a generator.
+	static constexpr unsigned NUM_SG = 2;
 	ISoundGenerator	*m_pSG[NUM_SG];		// registered generators
 	TMenuPage	*m_pSGPage[NUM_SG];	// each SG's top page (set in BuildMenus)
 	unsigned	 m_nActiveSG;
@@ -169,9 +171,11 @@ private:
 
 	// ── Static menu storage (built once in BuildMenus) ───────────────────────
 	TMenuPage	m_PageOSRoot;
-	TMenuPage	m_PageSoundGen;
+	TMenuPage	m_PageSoundGen;		// Plaits main page (m_pSGPage[0])
 	TMenuPage	m_PageTone;
 	TMenuPage	m_PageMod;		// Sound Gen → Mod (FM/timbre/morph amounts)
+	TMenuPage	m_PageDexed;		// Dexed main page (m_pSGPage[1])
+	TMenuPage	m_PageDexedOps;		// Dexed → Operators (per-op level + on/off)
 	TMenuPage	m_PageFXChain;
 	TMenuPage	m_PageYKChorus;
 	TMenuPage	m_PageCloudSeed;	// FX slot 0 param page
@@ -184,7 +188,7 @@ private:
 	TMenuPage	m_PageModLFO[2];	// Rate, Shape, Depth, Target
 	TMenuPage	m_PageModEnv[2];	// Attack, Decay, Depth, Target
 
-	static constexpr unsigned MAX_MENU_ROWS = 128;
+	static constexpr unsigned MAX_MENU_ROWS = 160;
 	TMenuRow	m_MenuRows[MAX_MENU_ROWS];
 	unsigned	m_nMenuRowCount;
 

@@ -16,3 +16,6 @@
 [submodule "src/modules/midifx/arp"]
 	path = src/modules/midifx/arp
 	url = https://github.com/Akashic-Trance-Machines/AV-Arp.git
+[submodule "src/modules/generators/dexed"]
+	path = src/modules/generators/dexed
+	url = https://github.com/Akashic-Trance-Machines/AV-Dexed.git
