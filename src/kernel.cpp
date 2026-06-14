@@ -64,8 +64,13 @@ CKernel::CKernel ()
 	m_nNavHoldStart (0),
 	m_bNavLongFired (FALSE),
 	m_nMenuRowCount (0),
-	m_nLastDetentTick {0, 0, 0, 0, 0}
+	m_nLastDetentTick {0, 0, 0, 0, 0},
+	m_nActiveSG (0)
 {
+	// Register sound generators (index 0 = active at boot). Pages are bound
+	// later in BuildMenus once the menu tree exists.
+	m_pSG[0]     = &m_Plaits;
+	m_pSGPage[0] = nullptr;
 	m_ActLED.Blink (5);
 }
 
@@ -155,12 +160,13 @@ boolean CKernel::Initialize ()
 		m_nPrevPortB = m_MCP.ReadPortB ();
 	}
 
-	// ── Engine + Plaits generator ─────────────────────────────────────────────
-	LOGNOTE (">> Engine + Plaits init");
+	// ── Engine + generators ────────────────────────────────────────────────────
+	LOGNOTE (">> Engine + generators init");
 	m_Engine.Init (48000, MAX_BLOCK);
-	m_Plaits.Init (48000, MAX_BLOCK);
-	m_Engine.SetGeneratorDirect (0, &m_Plaits);
-	LOGNOTE ("Plaits loaded — 24 engines (VA VCF … Hi-Hat)");
+	for (unsigned i = 0; i < NUM_SG; i++)
+		m_pSG[i]->Init (48000, MAX_BLOCK);
+	m_Engine.SetGeneratorDirect (0, m_pSG[m_nActiveSG]);	// active SG → slot 0
+	LOGNOTE ("Generators loaded — active: Plaits");
 
 	// ── Audio FX init ─────────────────────────────────────────────────────────
 	LOGNOTE (">> Audio FX init");
@@ -275,6 +281,37 @@ static void InitPage (TMenuPage *p, const char *name, TMenuPage *parent)
 	memset (p, 0, sizeof (*p));
 	p->pName   = name;
 	p->pParent = parent;
+}
+
+// ── Sound-generator selector ────────────────────────────────────────────────
+// Cycles the active generator, rewires engine slot 0, and jumps to the new
+// generator's page so its parameters show. The mod router follows via
+// ActiveSG() in Run(). With one SG registered this wraps to itself (no-op
+// visible change); it becomes a real switch once a second SG is added.
+
+void CKernel::SelectSG (unsigned nIdx)
+{
+	if (nIdx >= NUM_SG || nIdx == m_nActiveSG)
+		return;				// out of range or no change
+	m_nActiveSG = nIdx;
+	m_Engine.SetGeneratorDirect (0, m_pSG[nIdx]);
+	if (m_pSGPage[nIdx])
+		m_UI.NavigateToPage (m_pSGPage[nIdx]);
+}
+
+void CKernel::SGSelectAdjust (void *pCtx, int nDelta)
+{
+	CKernel *pThis = static_cast<CKernel *> (pCtx);
+	int n     = (int) pThis->m_nActiveSG + (nDelta > 0 ? 1 : -1);
+	int count = (int) NUM_SG;
+	n = ((n % count) + count) % count;
+	pThis->SelectSG ((unsigned) n);
+}
+
+void CKernel::SGSelectGetStr (void *pCtx, char *pBuf, unsigned nMax)
+{
+	CKernel *pThis = static_cast<CKernel *> (pCtx);
+	snprintf (pBuf, nMax, "%s", pThis->m_pSG[pThis->m_nActiveSG]->Name ());
 }
 
 // ── Volume callbacks ──────────────────────────────────────────────────────────
@@ -591,9 +628,11 @@ void CKernel::BuildMenus ()
 	for (unsigned i = 11; i <= 20; i++)		// 5 × (Source, Amount)
 		MakeParamRow (&m_PageMod, &m_Plaits, i);
 
-	// ── Sound Generator page ──────────────────────────────────────────────
+	// ── Sound Generator page (Plaits) ─────────────────────────────────────
+	// Bind this page as the active SG's page so the selector can jump here.
 	InitPage (&m_PageSoundGen, "Sound Generator", &m_PageOSRoot);
-	MakeReadOnlyRow (&m_PageSoundGen, "SG",         "Plaits");	// selector (v1 read-only)
+	m_pSGPage[0] = &m_PageSoundGen;
+	MakeFreeRow     (&m_PageSoundGen, "SG", SGSelectAdjust, SGSelectGetStr, this);
 	MakeParamRow    (&m_PageSoundGen, &m_Plaits, 0);		// engine
 	MakeParamRow    (&m_PageSoundGen, &m_Plaits, 9);		// voices (Mono..8)
 	MakeParamRow    (&m_PageSoundGen, &m_Plaits, 10);		// mono trig (Legato/Retrig)
@@ -726,7 +765,7 @@ TShutdownMode CKernel::Run ()
 		{
 			uint32_t nNow = m_Timer.GetClockTicks ();
 			m_Engine.Tick (nNow);				// drives clock-synced MIDI FX (arp)
-			m_ModRouter.Update (nNow, m_fBPM, &m_Plaits);	// LFO/env → Plaits live mod
+			m_ModRouter.Update (nNow, m_fBPM, ActiveSG ());	// LFO/env → active SG
 		}
 		if (m_bGUIReady)
 		{

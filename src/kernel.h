@@ -103,6 +103,20 @@ private:
 	// ── Generators ────────────────────────────────────────────────────────
 	CPlaitsGenerator	m_Plaits;
 
+	// SG registry — the active generator is m_pSG[m_nActiveSG], wired into
+	// engine slot 0 and fed by the mod router. Pages are hand-built per SG;
+	// the "SG" selector row cycles the active one, rewires the engine, and
+	// jumps to that SG's page. Bump NUM_SG and register the new instance +
+	// page to add a generator (e.g. Dexed).
+	static constexpr unsigned NUM_SG = 1;
+	ISoundGenerator	*m_pSG[NUM_SG];		// registered generators
+	TMenuPage	*m_pSGPage[NUM_SG];	// each SG's top page (set in BuildMenus)
+	unsigned	 m_nActiveSG;
+	ISoundGenerator	*ActiveSG ()		{ return m_pSG[m_nActiveSG]; }
+	void		 SelectSG (unsigned nIdx);
+	static void	 SGSelectAdjust (void *pCtx, int nDelta);
+	static void	 SGSelectGetStr (void *pCtx, char *pBuf, unsigned nMax);
+
 	// ── Audio FX instances ────────────────────────────────────────────────
 	CCloudSeedFX		m_CloudSeed;
 	CYKChorusFX		m_YKChorus;
@@ -110,7 +124,7 @@ private:
 	// ── MIDI FX instances ─────────────────────────────────────────────────
 	CArpMidiFX		m_Arp;
 
-	// ── Mod router (2 LFOs + 2 cyclic envelopes → Plaits live mod) ────────
+	// ── Mod router (2 LFOs + 2 cyclic envelopes → active SG) ──────────────
 	CModRouter		m_ModRouter;
 
 	// ── 4-row UI ──────────────────────────────────────────────────────────

@@ -17,7 +17,7 @@
 #include "ccyclicenv.h"
 #include <cstdint>
 
-class CPlaitsGenerator;
+class ISoundGenerator;
 
 class CModRouter
 {
@@ -30,10 +30,11 @@ public:
 	CLFO       &LFO (unsigned n)	{ return m_LFO[n < NUM_LFOS ? n : 0]; }
 	CCyclicEnv &Env (unsigned n)	{ return m_Env[n < NUM_ENVS ? n : 0]; }
 
-	// Advance all sources one tick and push their values to the SG.
+	// Advance all sources one tick and push their values to the active SG.
 	// Call from the main loop with CTimer::GetClockTicks() (microseconds) and
-	// the current BPM (used by sources in sync mode).
-	void Update (uint32_t nNowUs, float fBPM, CPlaitsGenerator *pPlaits);
+	// the current BPM (used by sources in sync mode). pGen may be any
+	// ISoundGenerator (or nullptr) — the router is generator-agnostic.
+	void Update (uint32_t nNowUs, float fBPM, ISoundGenerator *pGen);
 
 private:
 	CLFO		m_LFO[NUM_LFOS];

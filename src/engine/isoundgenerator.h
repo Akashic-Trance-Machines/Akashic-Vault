@@ -35,6 +35,16 @@ public:
 	// (overwrite) their output. Real-time: no allocation/locks/logging.
 	virtual void	Process (float *pOutL, float *pOutR, unsigned nFrames) = 0;
 
+	// Mod sources pushed from the main-loop mod router (2 LFOs + 2 cyclic
+	// envelopes). LFO values are bipolar (±depth), Env values unipolar
+	// (0..depth). The generator PULLS these into its own parameters as it sees
+	// fit (see the mod_src_/mod_amt_ params on each SG). Default: ignore.
+	// Written from the main loop, read in the audio callback — the generator
+	// is responsible for making the hand-off lock-free (single-float stores
+	// are atomic on AArch64).
+	virtual void	SetModSources (float /*fLFO1*/, float /*fLFO2*/,
+				       float /*fEnv1*/, float /*fEnv2*/) {}
+
 	// Optional: number of voices currently sounding (for UI/status). 0 if N/A.
 	virtual unsigned ActiveVoices () const { return 0; }
 };
