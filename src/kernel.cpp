@@ -105,6 +105,23 @@ boolean CKernel::Initialize ()
 	if (bOK) bOK = m_Interrupt.Initialize ();
 	if (bOK) bOK = m_Timer.Initialize ();
 
+	// ── I2C master + OLED + LVGL FIRST, so the boot splash appears ASAP ──────
+	// The display only needs I2C; bring both up before the slower USB/EMMC/SD
+	// and engine init so the splash covers that wait instead of a blank panel.
+	LOGNOTE (">> I2C master init");
+	if (bOK && !m_I2CMaster.Initialize ())
+		LOGWARN ("I2C master init failed");
+
+	LOGNOTE (">> OLED Display + LVGL init");
+	boolean bDisplayOK = m_Display.Initialize ();
+	boolean bGUI_OK    = bDisplayOK && m_GUI.Initialize ();
+	m_bGUIReady        = bGUI_OK;
+	if (!bDisplayOK) LOGWARN ("OLED display init failed");
+
+	// Splash up now — the OLED holds this frame through the heavy init below.
+	if (bGUI_OK)
+		ShowBootSplash ();
+
 	// ── USB host (USB MIDI): non-fatal ────────────────────────────────────────
 	LOGNOTE (">> USBHCI init");
 	if (bOK)
@@ -113,11 +130,6 @@ boolean CKernel::Initialize ()
 		if (!m_bUsbHCIInitialized)
 			LOGWARN ("USBHCI init failed — USB MIDI unavailable");
 	}
-
-	// ── I2C master: non-fatal — OLED/MCP won't work but audio still runs ─────
-	LOGNOTE (">> I2C master init");
-	if (bOK && !m_I2CMaster.Initialize ())
-		LOGWARN ("I2C master init failed");
 
 	// ── EMMC: non-fatal — presets/config unavailable but audio still runs ────
 	LOGNOTE (">> EMMC init");
@@ -135,19 +147,6 @@ boolean CKernel::Initialize ()
 		LOGWARN ("SD mount failed (presets/config unavailable)");
 
 	LOGNOTE ("Akashic Vault " VERSION " starting");
-
-	// ── OLED via CLVGL: non-fatal ─────────────────────────────────────────────
-	LOGNOTE (">> OLED Display + LVGL init");
-	boolean bDisplayOK = m_Display.Initialize ();
-	boolean bGUI_OK    = bDisplayOK && m_GUI.Initialize ();
-	m_bGUIReady        = bGUI_OK;
-	if (!bDisplayOK) LOGWARN ("OLED display init failed");
-
-	// Show the boot splash NOW — the display is up but the heavy engine /
-	// CloudSeed / SD work below still takes several seconds. The OLED holds
-	// this frame until the menu replaces it, so the wait shows life instantly.
-	if (bGUI_OK)
-		ShowBootSplash ();
 
 	// ── MCP23017 (encoders + buttons): non-fatal ──────────────────────────────
 	if (bOK)
