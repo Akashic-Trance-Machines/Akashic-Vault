@@ -164,6 +164,7 @@ private:
 	// ── FX slot selection ────────────────────────────────────────────────────
 	// 0 = None, 1 = CloudSeed, 2 = YKChorus
 	unsigned		m_nFXSlot[3];
+	boolean			m_bCloudSeedInit;	// CloudSeed lazily allocated yet?
 	void		ApplyFXSlot   (unsigned nSlot);
 	void		AdjustFXSlot  (unsigned nSlot, int nDelta);
 	const char	*GetFXSlotName (unsigned nSlot) const;

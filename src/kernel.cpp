@@ -59,7 +59,8 @@ CKernel::CKernel ()
 	m_nExtClockDeltaUs (0),
 	m_bExtClockValid (false),
 	m_nVolume (80),
-	m_nFXSlot {1, 0, 0},	// FX1=CloudSeed, FX2=None, FX3=None
+	m_nFXSlot {0, 0, 0},	// all FX slots empty on boot (CloudSeed lazy-init)
+	m_bCloudSeedInit (FALSE),
 	m_bNavHeld (FALSE),
 	m_nNavHoldStart (0),
 	m_bNavLongFired (FALSE),
@@ -184,14 +185,16 @@ boolean CKernel::Initialize ()
 	LOGNOTE (">> Dexed banks: %u found, loaded=%d", m_nDexedBankCount, bBankLoaded ? 1 : 0);
 
 	// ── Audio FX init ─────────────────────────────────────────────────────────
+	// All FX slots start empty (None) for a fast boot. YKChorus is light, so
+	// init it eagerly; CloudSeed (~65 MB) is lazy-initialised the first time
+	// it's selected (see ApplyFXSlot) — this is the main boot-time saving.
 	LOGNOTE (">> Audio FX init");
-	m_CloudSeed.Init (48000, MAX_BLOCK);
-	m_YKChorus.Init  (48000, MAX_BLOCK);
-	m_nFXSlot[0] = 1;
+	m_YKChorus.Init (48000, MAX_BLOCK);
+	m_bCloudSeedInit = false;
+	m_nFXSlot[0] = 0;
 	m_nFXSlot[1] = 0;
 	m_nFXSlot[2] = 0;
-	m_Engine.SetAudioFXDirect (0, &m_CloudSeed);
-	LOGNOTE ("FX ready");
+	LOGNOTE ("FX ready (slots empty; CloudSeed lazy)");
 
 	// ── MIDI FX init ──────────────────────────────────────────────────────────
 	LOGNOTE (">> MIDI FX init");
@@ -701,7 +704,17 @@ void CKernel::ApplyFXSlot (unsigned nSlot)
 	IAudioFX *pFX = nullptr;
 	switch (m_nFXSlot[nSlot])
 	{
-		case 1: pFX = &m_CloudSeed; break;
+		case 1:
+			// CloudSeed is ~65 MB and slow to allocate — lazy-init on first
+			// selection so it doesn't cost boot time. Brief one-time pause
+			// here while the reverb is built; audio keeps running (dry).
+			if (!m_bCloudSeedInit)
+			{
+				m_CloudSeed.Init (48000, MAX_BLOCK);
+				m_bCloudSeedInit = true;
+			}
+			pFX = &m_CloudSeed;
+			break;
 		case 2: pFX = &m_YKChorus;  break;
 		default: break;
 	}
