@@ -12,6 +12,11 @@
 #include "cmoduleregistry.h"
 #include <cstring>
 
+// Summed-generator trim applied before the FX chain (~-4.4 dB). Generators
+// can each peak near full scale; this leaves headroom so the master sits
+// comfortably near 80% and reverbs receive a sane input level.
+static constexpr float GEN_HEADROOM = 0.6f;
+
 CEngine::CEngine () {}
 CEngine::~CEngine () {}
 
@@ -276,6 +281,17 @@ void CEngine::Process (float *pOutL, float *pOutR, unsigned nFrames)
 			m_MixL[i] += tmpL[i];
 			m_MixR[i] += tmpR[i];
 		}
+	}
+
+	// Generator headroom: individual generators can peak near full scale, so
+	// a single voice already pushes the master near clipping (you end up
+	// running master volume low). Trim the summed generator signal here, before
+	// the FX chain — this leaves comfortable headroom at ~80% master AND feeds
+	// reverbs a saner input level so high-feedback presets don't rail.
+	for (unsigned i = 0; i < nFrames; i++)
+	{
+		m_MixL[i] *= GEN_HEADROOM;
+		m_MixR[i] *= GEN_HEADROOM;
 	}
 
 	// Run the FX chain in order (skip empty / bypassed slots).
