@@ -811,7 +811,15 @@ void CKernel::ShowBootSplash ()
 	lv_obj_set_style_text_color (t2, lv_color_white (), LV_PART_MAIN);
 	lv_obj_center (t2);
 
-	m_GUI.Update ();		// flush the splash to the OLED right now
+	// Flush to the OLED and hold the splash visible for ~1.5s. A single
+	// Update() can return before LVGL's refresh timer is due (nothing drawn);
+	// repeated calls guarantee the flush, and boot is now fast enough (lazy
+	// CloudSeed) that the splash would otherwise flash past unseen.
+	for (unsigned i = 0; i < 50; i++)
+	{
+		m_GUI.Update ();
+		m_Timer.MsDelay (30);
+	}
 }
 
 // ── BuildMenus ────────────────────────────────────────────────────────────────
