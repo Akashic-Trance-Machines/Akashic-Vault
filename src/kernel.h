@@ -58,6 +58,7 @@ private:
 	void	PollMidi ();		// TRS UART + USB MIDI -> m_Engine.PushMidi
 	void	DispatchMidi (u8 status, u8 d1, u8 d2);	// build TMidiEvent, push to engine
 	void	BuildMenus ();		// construct static menu tree
+	void	ShowBootSplash ();	// draw "AKASHIC VAULT" splash + flush to OLED
 	TMenuRow *AllocRow ();		// allocate next row from static pool
 
 	// Menu row factory methods

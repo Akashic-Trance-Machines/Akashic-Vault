@@ -142,12 +142,11 @@ boolean CKernel::Initialize ()
 	m_bGUIReady        = bGUI_OK;
 	if (!bDisplayOK) LOGWARN ("OLED display init failed");
 
+	// Show the boot splash NOW — the display is up but the heavy engine /
+	// CloudSeed / SD work below still takes several seconds. The OLED holds
+	// this frame until the menu replaces it, so the wait shows life instantly.
 	if (bGUI_OK)
-	{
-		lv_obj_set_style_bg_color   (lv_screen_active (), lv_color_black (), LV_PART_MAIN);
-		lv_obj_set_style_bg_opa     (lv_screen_active (), LV_OPA_COVER,     LV_PART_MAIN);
-		lv_obj_set_style_text_color (lv_screen_active (), lv_color_white (), LV_PART_MAIN);
-	}
+		ShowBootSplash ();
 
 	// ── MCP23017 (encoders + buttons): non-fatal ──────────────────────────────
 	if (bOK)
@@ -215,6 +214,11 @@ boolean CKernel::Initialize ()
 	// ── 4-row UI: only if OLED + LVGL initialised ────────────────────────────
 	if (bGUI_OK)
 	{
+		// Clear the boot splash and restore the menu's white-on-black scheme.
+		lv_obj_clean (lv_screen_active ());
+		lv_obj_set_style_bg_color   (lv_screen_active (), lv_color_black (), LV_PART_MAIN);
+		lv_obj_set_style_bg_opa     (lv_screen_active (), LV_OPA_COVER,     LV_PART_MAIN);
+		lv_obj_set_style_text_color (lv_screen_active (), lv_color_white (), LV_PART_MAIN);
 		BuildMenus ();
 		m_UI.Init (&m_PageOSRoot);
 	}
@@ -747,6 +751,56 @@ void CKernel::FXSlotAction (void *pCtx)
 	c->pKernel->NavigateToFXParams (c->nSlot);
 }
 
+// ── Boot splash ─────────────────────────────────────────────────────────────
+// "AKASHIC VAULT" in black on a white 128×64 panel: AKASHIC as plain black
+// text above an inverted (white-on-black) VAULT bar, framed by a thin border.
+// Drawn once on lv_screen_active() and flushed immediately; the OLED holds it
+// through the rest of Initialize(). Cleared before the menu UI is built.
+
+void CKernel::ShowBootSplash ()
+{
+	lv_obj_t *scr = lv_screen_active ();
+	lv_obj_set_style_bg_color (scr, lv_color_white (), LV_PART_MAIN);
+	lv_obj_set_style_bg_opa   (scr, LV_OPA_COVER,      LV_PART_MAIN);
+
+	// Thin black frame (vault-door motif).
+	lv_obj_t *frame = lv_obj_create (scr);
+	lv_obj_set_size (frame, 124, 60);
+	lv_obj_align (frame, LV_ALIGN_CENTER, 0, 0);
+	lv_obj_set_style_bg_opa       (frame, LV_OPA_TRANSP, LV_PART_MAIN);
+	lv_obj_set_style_radius       (frame, 0, LV_PART_MAIN);
+	lv_obj_set_style_border_color (frame, lv_color_black (), LV_PART_MAIN);
+	lv_obj_set_style_border_width (frame, 1, LV_PART_MAIN);
+	lv_obj_set_style_pad_all      (frame, 0, LV_PART_MAIN);
+	lv_obj_clear_flag (frame, LV_OBJ_FLAG_SCROLLABLE);
+
+	// "AKASHIC" — black text, upper half.
+	lv_obj_t *t1 = lv_label_create (scr);
+	lv_label_set_text (t1, "AKASHIC");
+	lv_obj_set_style_text_font  (t1, &lv_font_montserrat_16, LV_PART_MAIN);
+	lv_obj_set_style_text_color (t1, lv_color_black (), LV_PART_MAIN);
+	lv_obj_align (t1, LV_ALIGN_CENTER, 0, -13);
+
+	// "VAULT" — white text on a black bar, lower half (inverted accent).
+	lv_obj_t *bar = lv_obj_create (scr);
+	lv_obj_set_size (bar, 84, 24);
+	lv_obj_align (bar, LV_ALIGN_CENTER, 0, 13);
+	lv_obj_set_style_bg_color     (bar, lv_color_black (), LV_PART_MAIN);
+	lv_obj_set_style_bg_opa       (bar, LV_OPA_COVER, LV_PART_MAIN);
+	lv_obj_set_style_radius       (bar, 0, LV_PART_MAIN);
+	lv_obj_set_style_border_width (bar, 0, LV_PART_MAIN);
+	lv_obj_set_style_pad_all      (bar, 0, LV_PART_MAIN);
+	lv_obj_clear_flag (bar, LV_OBJ_FLAG_SCROLLABLE);
+
+	lv_obj_t *t2 = lv_label_create (bar);
+	lv_label_set_text (t2, "VAULT");
+	lv_obj_set_style_text_font  (t2, &lv_font_montserrat_16, LV_PART_MAIN);
+	lv_obj_set_style_text_color (t2, lv_color_white (), LV_PART_MAIN);
+	lv_obj_center (t2);
+
+	m_GUI.Update ();		// flush the splash to the OLED right now
+}
+
 // ── BuildMenus ────────────────────────────────────────────────────────────────
 
 void CKernel::BuildMenus ()
@@ -932,6 +986,22 @@ TShutdownMode CKernel::Run ()
 		{
 			m_UI.Draw ();
 			m_GUI.Update ();
+		}
+
+		// ── Audio diagnostics → HDMI log (~every 2s) ──────────────────────
+		// Worst-case block render time vs the deadline (256/48k ≈ 5333µs) and
+		// output peak. Render time near/over the deadline = CPU dropouts;
+		// high peak with audible clicking = amplitude instability.
+		{
+			static unsigned s_nLastDiagTick = 0;
+			unsigned nT = m_Timer.GetTicks ();
+			if (nT - s_nLastDiagTick >= 200)	// 100Hz ticks → ~2s
+			{
+				s_nLastDiagTick = nT;
+				LOGNOTE ("AUDIO: render max %u us (deadline 5333) | peak %u/1000",
+					 m_I2SAudio.GetMaxRenderUs (), m_I2SAudio.GetPeakX1000 ());
+				m_I2SAudio.ResetDiag ();
+			}
 		}
 		m_Scheduler.Yield ();
 	}
