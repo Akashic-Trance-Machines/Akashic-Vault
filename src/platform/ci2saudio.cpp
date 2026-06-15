@@ -8,6 +8,7 @@
 //
 #include "ci2saudio.h"
 #include "../engine/cengine.h"
+#include <circle/timer.h>
 
 #include <cmath>
 #include <cstdint>
@@ -23,7 +24,9 @@ CI2SAudio::CI2SAudio (CInterruptSystem *pInterrupt,
 	m_nSampleRate (nSampleRate),
 	m_fVolume (1.0f),
 	m_fPhase (0.0f),
-	m_fPhaseInc (2.0f * (float) M_PI * 440.0f / (float) nSampleRate)
+	m_fPhaseInc (2.0f * (float) M_PI * 440.0f / (float) nSampleRate),
+	m_nMaxRenderUs (0),
+	m_nPeakX1000 (0)
 {
 }
 
@@ -51,7 +54,26 @@ unsigned CI2SAudio::GetChunk (u32 *pBuffer, unsigned nChunkSize)
 		// ── Production path: render engine signal chain ───────────────
 		// Scratch buffers live on the stack — keep nFrames ≤ MAX_BLOCK.
 		float outL[256], outR[256];
+
+		// Diagnostic: time the render (µs) to compare against the block
+		// deadline (nFrames/sampleRate). No logging here — main loop reads it.
+		const unsigned nStartUs = CTimer::GetClockTicks ();
 		m_pEngine->Process (outL, outR, nFrames);
+		const unsigned nRenderUs = CTimer::GetClockTicks () - nStartUs;
+		if (nRenderUs > m_nMaxRenderUs) m_nMaxRenderUs = nRenderUs;
+
+		float fPeak = 0.0f;
+		for (unsigned i = 0; i < nFrames; i++)
+		{
+			float al = outL[i] < 0.0f ? -outL[i] : outL[i];
+			float ar = outR[i] < 0.0f ? -outR[i] : outR[i];
+			if (al > fPeak) fPeak = al;
+			if (ar > fPeak) fPeak = ar;
+		}
+		{
+			unsigned nPk = (unsigned) (fPeak * 1000.0f);
+			if (nPk > m_nPeakX1000) m_nPeakX1000 = nPk;
+		}
 
 		for (unsigned i = 0; i < nFrames; i++)
 		{

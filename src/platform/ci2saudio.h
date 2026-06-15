@@ -40,6 +40,14 @@ public:
 	/// Master volume 0.0–1.0. Safe to call from main loop; read in DMA callback.
 	void SetVolume (float fVolume) { m_fVolume = fVolume; }
 
+	/// Diagnostics (written in the DMA callback, read from the main loop).
+	/// Worst-case block render time in microseconds; deadline is
+	/// nFrames/sampleRate (≈5333µs for 256@48k). Approaching it → dropouts.
+	unsigned GetMaxRenderUs () const { return m_nMaxRenderUs; }
+	/// Peak |output| since last reset, ×1000 (so 1000 = full scale).
+	unsigned GetPeakX1000  () const { return m_nPeakX1000; }
+	void	 ResetDiag     ()       { m_nMaxRenderUs = 0; m_nPeakX1000 = 0; }
+
 protected:
 	/// Called from DMA interrupt — fill pBuffer with nChunkSize words (L,R pairs).
 	unsigned GetChunk (u32 *pBuffer, unsigned nChunkSize) override;
@@ -52,4 +60,8 @@ private:
 	// Sine oscillator state (smoke-test, real-time safe).
 	float	  m_fPhase;
 	float	  m_fPhaseInc;	// = 2π × 440 / sampleRate
+
+	// Diagnostics (volatile: written in DMA callback, read in main loop).
+	volatile unsigned m_nMaxRenderUs;
+	volatile unsigned m_nPeakX1000;
 };
