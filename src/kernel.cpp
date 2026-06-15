@@ -176,9 +176,12 @@ boolean CKernel::Initialize ()
 	// real DX7 patch ready when the user selects it (falls back to the
 	// built-in init voice if no bank is present).
 	ScanDexedBanks ();
-	if (m_nDexedBankCount > 0)
-		LoadDexedBank (0);
-	LOGNOTE (">> Dexed banks: %u found", m_nDexedBankCount);
+	bool bBankLoaded = false;
+	for (unsigned i = 0; i < m_nDexedBankCount && !bBankLoaded; i++)
+		bBankLoaded = LoadDexedBank (i);
+	if (!bBankLoaded)
+		m_nDexedBank = -1;	// none valid → init voice, "None" in UI
+	LOGNOTE (">> Dexed banks: %u found, loaded=%d", m_nDexedBankCount, bBankLoaded ? 1 : 0);
 
 	// ── Audio FX init ─────────────────────────────────────────────────────────
 	LOGNOTE (">> Audio FX init");
@@ -349,12 +352,15 @@ bool CKernel::LoadDexedBank (unsigned nIdx)
 	FRESULT res = f_read (&file, m_DexedBankBuf, sizeof (m_DexedBankBuf), &nRead);
 	f_close (&file);
 
+	// Track the browse position even if the file is unreadable/invalid, so a
+	// single bad bank can't wedge cycling — the user can scroll past it.
+	m_nDexedBank = (int) nIdx;
+
 	if (res != FR_OK || nRead != CDexedGenerator::BANK_SYSEX_LEN)
 		return false;
 	if (!m_Dexed.LoadBankSysex (m_DexedBankBuf, nRead))
 		return false;
 
-	m_nDexedBank = (int) nIdx;
 	m_Dexed.SelectPatch (0);
 	return true;
 }
