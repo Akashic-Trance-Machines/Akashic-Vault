@@ -114,6 +114,7 @@ private:
 	ISoundGenerator	*m_pSG[NUM_SG];		// registered generators
 	TMenuPage	*m_pSGPage[NUM_SG];	// each SG's top page (set in BuildMenus)
 	unsigned	 m_nActiveSG;
+	TMenuRow	*m_pRootSGRow;		// root "Sound Generator" row → active SG page
 	ISoundGenerator	*ActiveSG ()		{ return m_pSG[m_nActiveSG]; }
 	void		 SelectSG (unsigned nIdx);
 	static void	 SGSelectAdjust (void *pCtx, int nDelta);

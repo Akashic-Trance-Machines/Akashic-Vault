@@ -66,6 +66,10 @@ void C4RowRenderer::Init ()
 		lv_obj_set_size (m_pRowLabel[i], TEXT_W, ROW_H);
 		lv_label_set_long_mode (m_pRowLabel[i], LV_LABEL_LONG_CLIP);
 		lv_obj_set_style_text_color  (m_pRowLabel[i], lv_color_white (), LV_PART_MAIN);
+		// Dense 1-bit-friendly pixel font, tightened by 1px so labels read
+		// compactly on the 128-px-wide OLED (default tracking looks too airy).
+		lv_obj_set_style_text_font   (m_pRowLabel[i], &lv_font_unscii_8, LV_PART_MAIN);
+		lv_obj_set_style_text_letter_space (m_pRowLabel[i], -1, LV_PART_MAIN);
 		// Opaque black bg (not transparent): I1 mode needs an explicit bg
 		// fill before drawing glyph pixels, otherwise text is invisible.
 		lv_obj_set_style_bg_color    (m_pRowLabel[i], lv_color_black (), LV_PART_MAIN);

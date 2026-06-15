@@ -75,6 +75,7 @@ CKernel::CKernel ()
 	m_pSG[1]     = &m_Dexed;
 	m_pSGPage[0] = nullptr;
 	m_pSGPage[1] = nullptr;
+	m_pRootSGRow = nullptr;
 	m_ActLED.Blink (5);
 }
 
@@ -428,6 +429,8 @@ void CKernel::SelectSG (unsigned nIdx)
 		return;				// out of range or no change
 	m_nActiveSG = nIdx;
 	m_Engine.SetGeneratorDirect (0, m_pSG[nIdx]);
+	if (m_pRootSGRow)			// keep root entry pointing at the active SG
+		m_pRootSGRow->pChildPage = m_pSGPage[nIdx];
 	if (m_pSGPage[nIdx])
 		m_UI.NavigateToPage (m_pSGPage[nIdx]);
 }
@@ -886,7 +889,11 @@ void CKernel::BuildMenus ()
 	// ── OS Root ───────────────────────────────────────────────────────────
 	InitPage (&m_PageOSRoot, "AV-OS", nullptr);
 	MakeFreeRow  (&m_PageOSRoot, "Volume",          VolumeAdjust, VolumeGetStr, this);
-	MakeMenuRow  (&m_PageOSRoot, "Sound Generator", &m_PageSoundGen);
+	// Point the root "Sound Generator" entry at the ACTIVE generator's page
+	// (not always Plaits). SelectSG keeps this in sync, so coming back from
+	// the root lands on the generator you're actually using.
+	MakeMenuRow  (&m_PageOSRoot, "Sound Generator", m_pSGPage[m_nActiveSG]);
+	m_pRootSGRow = m_PageOSRoot.pRows[m_PageOSRoot.nRows - 1];
 	MakeMenuRow  (&m_PageOSRoot, "FX Chain",        &m_PageFXChain);
 	MakeMenuRow  (&m_PageOSRoot, "MIDI FX",         &m_PageMidiFX);
 	MakeMenuRow  (&m_PageOSRoot, "Mod",             &m_PageModMain);
