@@ -257,6 +257,7 @@ void CKernel::MakeParamRow (TMenuPage *page, IModule *m, unsigned idx)
 	r->pLabel      = m->ParamDesc (idx).pLabel;
 	r->pModule     = m;
 	r->nParamIndex = idx;
+	if (page->nRows >= MAX_ROWS_PER_PAGE) return;	// guard: never overflow pRows[]
 	page->pRows[page->nRows++] = r;
 }
 
@@ -267,6 +268,7 @@ void CKernel::MakeMenuRow (TMenuPage *page, const char *label, TMenuPage *child)
 	r->pLabel     = label;
 	r->bHasAction = true;
 	r->pChildPage = child;
+	if (page->nRows >= MAX_ROWS_PER_PAGE) return;	// guard: never overflow pRows[]
 	page->pRows[page->nRows++] = r;
 }
 
@@ -280,6 +282,7 @@ void CKernel::MakeFreeRow (TMenuPage *page, const char *label,
 	r->pfAdjust   = pfAdj;
 	r->pfGetStr   = pfGet;
 	r->pFreeCtx   = ctx;
+	if (page->nRows >= MAX_ROWS_PER_PAGE) return;	// guard: never overflow pRows[]
 	page->pRows[page->nRows++] = r;
 }
 
@@ -289,6 +292,7 @@ void CKernel::MakeReadOnlyRow (TMenuPage *page, const char *label, const char *v
 	r->type         = TMenuRowType::ReadOnly;
 	r->pLabel       = label;
 	r->pStaticValue = value;
+	if (page->nRows >= MAX_ROWS_PER_PAGE) return;	// guard: never overflow pRows[]
 	page->pRows[page->nRows++] = r;
 }
 

@@ -202,7 +202,7 @@ private:
 	TMenuPage	m_PageModLFO[2];	// Rate, Shape, Depth, Target
 	TMenuPage	m_PageModEnv[2];	// Attack, Decay, Depth, Target
 
-	static constexpr unsigned MAX_MENU_ROWS = 160;
+	static constexpr unsigned MAX_MENU_ROWS = 256;
 	TMenuRow	m_MenuRows[MAX_MENU_ROWS];
 	unsigned	m_nMenuRowCount;
 

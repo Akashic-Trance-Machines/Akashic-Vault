@@ -57,7 +57,8 @@ struct TMenuRow
 
 // ── Menu page ─────────────────────────────────────────────────────────────────
 
-static constexpr unsigned MAX_ROWS_PER_PAGE = 32;
+// Must exceed the largest single module's parameter count (CloudSeed = 46).
+static constexpr unsigned MAX_ROWS_PER_PAGE = 64;
 
 struct TMenuPage
 {
