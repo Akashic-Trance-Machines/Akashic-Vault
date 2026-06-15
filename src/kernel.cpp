@@ -314,6 +314,8 @@ void CKernel::ScanDexedBanks ()
 	{
 		if (fno.fattrib & AM_DIR)
 			continue;
+		if (fno.fname[0] == '.')	// skip hidden + macOS ._ AppleDouble
+			continue;
 		size_t len = strlen (fno.fname);
 		if (len < 5)
 			continue;
