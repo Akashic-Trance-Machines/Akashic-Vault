@@ -119,6 +119,19 @@ private:
 	static void	 SGSelectAdjust (void *pCtx, int nDelta);
 	static void	 SGSelectGetStr (void *pCtx, char *pBuf, unsigned nMax);
 
+	// ── Dexed bank/patch browser — reads DX7 .syx banks from SD:/dexed ────
+	static constexpr unsigned MAX_DEXED_BANKS = 32;
+	char		m_DexedBankName[MAX_DEXED_BANKS][64];
+	unsigned	m_nDexedBankCount;
+	int		m_nDexedBank;		// index into m_DexedBankName, -1 = none
+	uint8_t		m_DexedBankBuf[CDexedGenerator::BANK_SYSEX_LEN];
+	void		ScanDexedBanks ();
+	bool		LoadDexedBank (unsigned nIdx);
+	static void	DexedBankAdjust  (void *pCtx, int nDelta);
+	static void	DexedBankGetStr  (void *pCtx, char *pBuf, unsigned nMax);
+	static void	DexedPatchAdjust (void *pCtx, int nDelta);
+	static void	DexedPatchGetStr (void *pCtx, char *pBuf, unsigned nMax);
+
 	// ── Audio FX instances ────────────────────────────────────────────────
 	CCloudSeedFX		m_CloudSeed;
 	CYKChorusFX		m_YKChorus;

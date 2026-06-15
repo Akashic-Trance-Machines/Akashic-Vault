@@ -65,7 +65,9 @@ CKernel::CKernel ()
 	m_bNavLongFired (FALSE),
 	m_nMenuRowCount (0),
 	m_nLastDetentTick {0, 0, 0, 0, 0},
-	m_nActiveSG (0)
+	m_nActiveSG (0),
+	m_nDexedBankCount (0),
+	m_nDexedBank (-1)
 {
 	// Register sound generators (index 0 = active at boot). Pages are bound
 	// later in BuildMenus once the menu tree exists.
@@ -169,6 +171,14 @@ boolean CKernel::Initialize ()
 		m_pSG[i]->Init (48000, MAX_BLOCK);
 	m_Engine.SetGeneratorDirect (0, m_pSG[m_nActiveSG]);	// active SG → slot 0
 	LOGNOTE ("Generators loaded — active: Plaits");
+
+	// Dexed: scan SD:/dexed for .syx banks; load the first so Dexed has a
+	// real DX7 patch ready when the user selects it (falls back to the
+	// built-in init voice if no bank is present).
+	ScanDexedBanks ();
+	if (m_nDexedBankCount > 0)
+		LoadDexedBank (0);
+	LOGNOTE (">> Dexed banks: %u found", m_nDexedBankCount);
 
 	// ── Audio FX init ─────────────────────────────────────────────────────────
 	LOGNOTE (">> Audio FX init");
@@ -283,6 +293,119 @@ static void InitPage (TMenuPage *p, const char *name, TMenuPage *parent)
 	memset (p, 0, sizeof (*p));
 	p->pName   = name;
 	p->pParent = parent;
+}
+
+// ── Dexed bank/patch browser ────────────────────────────────────────────────
+// Scans SD:/dexed for *.syx DX7 banks; the Bank row picks a file (read + hand
+// to the engine), the Patch row scrolls the 32 voices within it. File I/O runs
+// in the main loop (UI context), never the audio path.
+
+void CKernel::ScanDexedBanks ()
+{
+	m_nDexedBankCount = 0;
+	m_nDexedBank      = -1;
+
+	DIR dir;
+	if (f_opendir (&dir, DRIVE "/dexed") != FR_OK)
+		return;
+
+	FILINFO fno;
+	while (f_readdir (&dir, &fno) == FR_OK && fno.fname[0] != 0)
+	{
+		if (fno.fattrib & AM_DIR)
+			continue;
+		size_t len = strlen (fno.fname);
+		if (len < 5)
+			continue;
+		const char *ext = fno.fname + len - 4;	// ".syx" (case-insensitive)
+		if (ext[0] != '.' ||
+		    (ext[1] != 's' && ext[1] != 'S') ||
+		    (ext[2] != 'y' && ext[2] != 'Y') ||
+		    (ext[3] != 'x' && ext[3] != 'X'))
+			continue;
+		if (m_nDexedBankCount >= MAX_DEXED_BANKS)
+			break;
+		strncpy (m_DexedBankName[m_nDexedBankCount], fno.fname, 63);
+		m_DexedBankName[m_nDexedBankCount][63] = '\0';
+		m_nDexedBankCount++;
+	}
+	f_closedir (&dir);
+}
+
+bool CKernel::LoadDexedBank (unsigned nIdx)
+{
+	if (nIdx >= m_nDexedBankCount)
+		return false;
+
+	char path[96];
+	snprintf (path, sizeof (path), DRIVE "/dexed/%s", m_DexedBankName[nIdx]);
+
+	FIL file;
+	if (f_open (&file, path, FA_READ) != FR_OK)
+		return false;
+	UINT nRead = 0;
+	FRESULT res = f_read (&file, m_DexedBankBuf, sizeof (m_DexedBankBuf), &nRead);
+	f_close (&file);
+
+	if (res != FR_OK || nRead != CDexedGenerator::BANK_SYSEX_LEN)
+		return false;
+	if (!m_Dexed.LoadBankSysex (m_DexedBankBuf, nRead))
+		return false;
+
+	m_nDexedBank = (int) nIdx;
+	m_Dexed.SelectPatch (0);
+	return true;
+}
+
+void CKernel::DexedBankAdjust (void *pCtx, int nDelta)
+{
+	CKernel *pK = static_cast<CKernel *> (pCtx);
+	if (pK->m_nDexedBankCount == 0)
+		return;
+	if (pK->m_nDexedBank < 0)		// none loaded yet → load the first
+	{
+		pK->LoadDexedBank (0);
+		return;
+	}
+	int n    = (int) pK->m_nDexedBankCount;
+	int next = ((pK->m_nDexedBank + (nDelta > 0 ? 1 : -1)) % n + n) % n;
+	pK->LoadDexedBank ((unsigned) next);
+}
+
+void CKernel::DexedBankGetStr (void *pCtx, char *pBuf, unsigned nMax)
+{
+	CKernel *pK = static_cast<CKernel *> (pCtx);
+	if (pK->m_nDexedBankCount == 0)
+		snprintf (pBuf, nMax, "(no SD)");
+	else if (pK->m_nDexedBank < 0)
+		snprintf (pBuf, nMax, "None");
+	else
+		snprintf (pBuf, nMax, "%s", pK->m_DexedBankName[pK->m_nDexedBank]);
+}
+
+void CKernel::DexedPatchAdjust (void *pCtx, int nDelta)
+{
+	CKernel *pK = static_cast<CKernel *> (pCtx);
+	unsigned nNum = pK->m_Dexed.NumPatches ();
+	if (nNum == 0)
+		return;
+	int n    = (int) nNum;
+	int cur  = (int) pK->m_Dexed.CurrentPatch ();
+	int next = ((cur + (nDelta > 0 ? 1 : -1)) % n + n) % n;
+	pK->m_Dexed.SelectPatch ((unsigned) next);
+}
+
+void CKernel::DexedPatchGetStr (void *pCtx, char *pBuf, unsigned nMax)
+{
+	CKernel *pK = static_cast<CKernel *> (pCtx);
+	if (!pK->m_Dexed.HasBank ())
+	{
+		snprintf (pBuf, nMax, "--");
+		return;
+	}
+	char name[12];
+	pK->m_Dexed.GetPatchName (pK->m_Dexed.CurrentPatch (), name, sizeof (name));
+	snprintf (pBuf, nMax, "%02u %s", pK->m_Dexed.CurrentPatch () + 1, name);
 }
 
 // ── Sound-generator selector ────────────────────────────────────────────────
@@ -652,7 +775,9 @@ void CKernel::BuildMenus ()
 	// ── Sound Generator page (Dexed) — bound as m_pSGPage[1] ──────────────
 	InitPage (&m_PageDexed, "Sound Generator", &m_PageOSRoot);
 	m_pSGPage[1] = &m_PageDexed;
-	MakeFreeRow  (&m_PageDexed, "SG", SGSelectAdjust, SGSelectGetStr, this);
+	MakeFreeRow  (&m_PageDexed, "SG",    SGSelectAdjust,   SGSelectGetStr,   this);
+	MakeFreeRow  (&m_PageDexed, "Bank",  DexedBankAdjust,  DexedBankGetStr,  this);
+	MakeFreeRow  (&m_PageDexed, "Patch", DexedPatchAdjust, DexedPatchGetStr, this);
 	MakeParamRow (&m_PageDexed, &m_Dexed, 0);		// algorithm
 	MakeParamRow (&m_PageDexed, &m_Dexed, 1);		// feedback
 	MakeParamRow (&m_PageDexed, &m_Dexed, 2);		// transpose
