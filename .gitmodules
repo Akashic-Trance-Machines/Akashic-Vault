@@ -19,3 +19,6 @@
 [submodule "src/modules/generators/dexed"]
 	path = src/modules/generators/dexed
 	url = https://github.com/Akashic-Trance-Machines/AV-Dexed.git
+[submodule "src/modules/generators/hera"]
+	path = src/modules/generators/hera
+	url = https://github.com/Akashic-Trance-Machines/AV-Hera.git

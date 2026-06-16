@@ -38,6 +38,7 @@
 #include "ui/c4rowui.h"
 #include "modules/generators/plaits/src/plaits_generator.h"
 #include "modules/generators/dexed/src/dexed_generator.h"
+#include "modules/generators/hera/src/hera_generator.h"
 #include "modules/audiofx/cloudseed/src/cloudseed_fx.h"
 #include "modules/audiofx/ykchorus/src/ykchorus_fx.h"
 #include "modules/midifx/arp/src/arp_midifx.h"
@@ -105,13 +106,14 @@ private:
 	// ── Generators ────────────────────────────────────────────────────────
 	CPlaitsGenerator	m_Plaits;
 	CDexedGenerator		m_Dexed;
+	CHeraGenerator		m_Hera;
 
 	// SG registry — the active generator is m_pSG[m_nActiveSG], wired into
 	// engine slot 0 and fed by the mod router. Pages are hand-built per SG;
 	// the "SG" selector row cycles the active one, rewires the engine, and
 	// jumps to that SG's page. Bump NUM_SG and register the new instance +
 	// page to add a generator.
-	static constexpr unsigned NUM_SG = 2;
+	static constexpr unsigned NUM_SG = 3;
 	ISoundGenerator	*m_pSG[NUM_SG];		// registered generators
 	TMenuPage	*m_pSGPage[NUM_SG];	// each SG's top page (set in BuildMenus)
 	unsigned	 m_nActiveSG;
@@ -192,6 +194,9 @@ private:
 	TMenuPage	m_PageMod;		// Sound Gen → Mod (FM/timbre/morph amounts)
 	TMenuPage	m_PageDexed;		// Dexed main page (m_pSGPage[1])
 	TMenuPage	m_PageDexedOps;		// Dexed → Operators (per-op level + on/off)
+	TMenuPage	m_PageHera;		// Hera main page (m_pSGPage[2])
+	TMenuPage	m_PageHeraTone;		// Hera → Tone (envelope + HPF)
+	TMenuPage	m_PageHeraMod;		// Hera → Mod (LFO + chorus)
 	TMenuPage	m_PageFXChain;
 	TMenuPage	m_PageYKChorus;
 	TMenuPage	m_PageCloudSeed;	// FX slot 0 param page

@@ -99,6 +99,19 @@ OBJS += \
 	$(DEXED_CORE)/EngineOpl.o \
 	$(DEXED_CORE)/PluginFx.o
 
+# ── AV-Hera (Juno-60 emulation, de-JUCE'd Hera core, GPL-3.0) ────────────────
+HERA_DIR  = modules/generators/hera
+HERA_CORE = $(HERA_DIR)/core/hera
+OBJS += \
+	$(HERA_DIR)/src/hera_generator.o \
+	$(HERA_CORE)/hera_plugin.o \
+	$(HERA_CORE)/Engine/HeraEnvelope.o \
+	$(HERA_CORE)/Engine/HeraLFO.o \
+	$(HERA_CORE)/Engine/HeraLFOWithEnvelope.o \
+	$(HERA_CORE)/Engine/HeraTables.o \
+	$(HERA_CORE)/Engine/bbd_filter.o \
+	$(HERA_CORE)/Engine/bbd_line.o
+
 # ── AV-CloudSeed (GhostNote algorithmic reverb, MIT core) ────────────────────
 CLOUDSEED_DIR  = modules/audiofx/cloudseed
 CLOUDSEED_CORE = $(CLOUDSEED_DIR)/core/CloudSeedCore
@@ -148,6 +161,8 @@ INCLUDE += -I $(PLAITS_CORE) -I $(PLAITS_DIR)/src
 # Dexed: vendored engine headers + src wrapper. <arm_math.h> resolves to the
 # shared CloudSeed compat stub already on the include path below.
 INCLUDE += -I $(DEXED_CORE) -I $(DEXED_DIR)/src
+# Hera: core root (for "Engine/...") + Engine dir (sibling + VCF/) + src wrapper.
+INCLUDE += -I $(HERA_CORE) -I $(HERA_CORE)/Engine -I $(HERA_DIR)/src
 # CloudSeed: core root + compat/ for <arm_math.h> stub on AArch64.
 # Force-include cstdlib so std::rand in the core compiles without patching it.
 INCLUDE += -I $(CLOUDSEED_CORE)/.. -I $(CLOUDSEED_DIR)/src -I $(CLOUDSEED_DIR)/core/compat

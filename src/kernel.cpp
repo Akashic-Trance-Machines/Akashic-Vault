@@ -74,8 +74,10 @@ CKernel::CKernel ()
 	// later in BuildMenus once the menu tree exists.
 	m_pSG[0]     = &m_Plaits;
 	m_pSG[1]     = &m_Dexed;
+	m_pSG[2]     = &m_Hera;
 	m_pSGPage[0] = nullptr;
 	m_pSGPage[1] = nullptr;
+	m_pSGPage[2] = nullptr;
 	m_pRootSGRow = nullptr;
 	m_ActLED.Blink (5);
 }
@@ -872,6 +874,27 @@ void CKernel::BuildMenus ()
 	MakeParamRow (&m_PageDexed, &m_Dexed, 2);		// transpose
 	MakeParamRow (&m_PageDexed, &m_Dexed, 3);		// voices (Mono..16)
 	MakeMenuRow  (&m_PageDexed, "Operators", &m_PageDexedOps);
+
+	// ── Hera sub-pages ────────────────────────────────────────────────────
+	InitPage (&m_PageHeraTone, "Tone", &m_PageHera);
+	for (unsigned i = 6; i <= 10; i++)			// attack..release, hpf
+		MakeParamRow (&m_PageHeraTone, &m_Hera, i);
+	InitPage (&m_PageHeraMod, "Mod", &m_PageHera);
+	for (unsigned i = 11; i <= 15; i++)			// lfo_rate..chorus_ii
+		MakeParamRow (&m_PageHeraMod, &m_Hera, i);
+
+	// ── Sound Generator page (Hera) — bound as m_pSGPage[2] ───────────────
+	InitPage (&m_PageHera, "Sound Generator", &m_PageOSRoot);
+	m_pSGPage[2] = &m_PageHera;
+	MakeFreeRow  (&m_PageHera, "SG", SGSelectAdjust, SGSelectGetStr, this);
+	MakeParamRow (&m_PageHera, &m_Hera, 0);			// cutoff
+	MakeParamRow (&m_PageHera, &m_Hera, 1);			// resonance
+	MakeParamRow (&m_PageHera, &m_Hera, 2);			// vcf env
+	MakeParamRow (&m_PageHera, &m_Hera, 3);			// saw
+	MakeParamRow (&m_PageHera, &m_Hera, 4);			// pulse
+	MakeParamRow (&m_PageHera, &m_Hera, 5);			// sub
+	MakeMenuRow  (&m_PageHera, "Tone", &m_PageHeraTone);
+	MakeMenuRow  (&m_PageHera, "Mod",  &m_PageHeraMod);
 
 	// ── CloudSeed param page (all params, scrollable) ────────────────────
 	InitPage (&m_PageCloudSeed, "CloudSeed", &m_PageFXChain);
