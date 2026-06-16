@@ -46,7 +46,9 @@ public:
 	unsigned GetMaxRenderUs () const { return m_nMaxRenderUs; }
 	/// Peak |output| since last reset, ×1000 (so 1000 = full scale).
 	unsigned GetPeakX1000  () const { return m_nPeakX1000; }
-	void	 ResetDiag     ()       { m_nMaxRenderUs = 0; m_nPeakX1000 = 0; }
+	/// Count of NaN/Inf output samples flushed to silence (per interval).
+	unsigned GetNanCount   () const { return m_nNanCount; }
+	void	 ResetDiag     ()       { m_nMaxRenderUs = 0; m_nPeakX1000 = 0; m_nNanCount = 0; }
 
 protected:
 	/// Called from DMA interrupt — fill pBuffer with nChunkSize words (L,R pairs).
@@ -64,4 +66,5 @@ private:
 	// Diagnostics (volatile: written in DMA callback, read in main loop).
 	volatile unsigned m_nMaxRenderUs;
 	volatile unsigned m_nPeakX1000;
+	volatile unsigned m_nNanCount;
 };

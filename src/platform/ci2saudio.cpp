@@ -26,7 +26,8 @@ CI2SAudio::CI2SAudio (CInterruptSystem *pInterrupt,
 	m_fPhase (0.0f),
 	m_fPhaseInc (2.0f * (float) M_PI * 440.0f / (float) nSampleRate),
 	m_nMaxRenderUs (0),
-	m_nPeakX1000 (0)
+	m_nPeakX1000 (0),
+	m_nNanCount (0)
 {
 }
 
@@ -77,14 +78,16 @@ unsigned CI2SAudio::GetChunk (u32 *pBuffer, unsigned nChunkSize)
 
 		for (unsigned i = 0; i < nFrames; i++)
 		{
-			// Clamp to [-1, 1].  The !(x >= lo) form also traps NaN
-			// (since any comparison with NaN returns false), replacing
-			// it with -1.0f rather than letting it propagate to the
-			// integer cast (undefined behaviour in C++).
+			// Flush NaN/Inf to SILENCE (not full-scale): a generator
+			// emitting NaN otherwise becomes a loud crackle here while
+			// reading as "quiet" on the peak meter (fabs(NaN) casts to 0).
+			// Count them so the diagnostic can confirm/localise the source.
 			float l = outL[i];
 			float r = outR[i];
-			if (!(l >= -1.0f)) l = -1.0f; else if (l >  1.0f) l =  1.0f;
-			if (!(r >= -1.0f)) r = -1.0f; else if (r >  1.0f) r =  1.0f;
+			if (l != l) { l = 0.0f; m_nNanCount++; }
+			else if (l < -1.0f) l = -1.0f; else if (l > 1.0f) l = 1.0f;
+			if (r != r) { r = 0.0f; m_nNanCount++; }
+			else if (r < -1.0f) r = -1.0f; else if (r > 1.0f) r = 1.0f;
 
 			pBuffer[i * 2]     = (u32)(s32)(l * s_fScale * m_fVolume);
 			pBuffer[i * 2 + 1] = (u32)(s32)(r * s_fScale * m_fVolume);

@@ -1041,8 +1041,9 @@ TShutdownMode CKernel::Run ()
 			if (nT - s_nLastDiagTick >= 200)	// 100Hz ticks → ~2s
 			{
 				s_nLastDiagTick = nT;
-				LOGNOTE ("AUDIO: render max %u us (deadline 5333) | peak %u/1000",
-					 m_I2SAudio.GetMaxRenderUs (), m_I2SAudio.GetPeakX1000 ());
+				LOGNOTE ("AUDIO: render max %u us (deadline 5333) | peak %u/1000 | NaN %u",
+					 m_I2SAudio.GetMaxRenderUs (), m_I2SAudio.GetPeakX1000 (),
+					 m_I2SAudio.GetNanCount ());
 				m_I2SAudio.ResetDiag ();
 			}
 		}
