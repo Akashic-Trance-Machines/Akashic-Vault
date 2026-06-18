@@ -44,6 +44,8 @@ public:
 	/// Worst-case block render time in microseconds; deadline is
 	/// nFrames/sampleRate (≈5333µs for 256@48k). Approaching it → dropouts.
 	unsigned GetMaxRenderUs () const { return m_nMaxRenderUs; }
+	/// Worst-case render time since boot (never reset) — catches one-time spikes.
+	unsigned GetMaxRenderUsEver () const { return m_nMaxRenderUsEver; }
 	/// Peak |output| since last reset, ×1000 (so 1000 = full scale).
 	unsigned GetPeakX1000  () const { return m_nPeakX1000; }
 	/// Count of NaN/Inf output samples flushed to silence (per interval).
@@ -65,6 +67,7 @@ private:
 
 	// Diagnostics (volatile: written in DMA callback, read in main loop).
 	volatile unsigned m_nMaxRenderUs;
+	volatile unsigned m_nMaxRenderUsEver;
 	volatile unsigned m_nPeakX1000;
 	volatile unsigned m_nNanCount;
 };

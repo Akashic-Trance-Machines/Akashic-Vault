@@ -26,6 +26,7 @@ CI2SAudio::CI2SAudio (CInterruptSystem *pInterrupt,
 	m_fPhase (0.0f),
 	m_fPhaseInc (2.0f * (float) M_PI * 440.0f / (float) nSampleRate),
 	m_nMaxRenderUs (0),
+	m_nMaxRenderUsEver (0),
 	m_nPeakX1000 (0),
 	m_nNanCount (0)
 {
@@ -61,7 +62,8 @@ unsigned CI2SAudio::GetChunk (u32 *pBuffer, unsigned nChunkSize)
 		const unsigned nStartUs = CTimer::GetClockTicks ();
 		m_pEngine->Process (outL, outR, nFrames);
 		const unsigned nRenderUs = CTimer::GetClockTicks () - nStartUs;
-		if (nRenderUs > m_nMaxRenderUs) m_nMaxRenderUs = nRenderUs;
+		if (nRenderUs > m_nMaxRenderUs)     m_nMaxRenderUs = nRenderUs;
+		if (nRenderUs > m_nMaxRenderUsEver) m_nMaxRenderUsEver = nRenderUs;	// never reset — catches one-time spikes
 
 		float fPeak = 0.0f;
 		for (unsigned i = 0; i < nFrames; i++)
